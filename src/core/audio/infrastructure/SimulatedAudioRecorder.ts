@@ -48,8 +48,8 @@ export class SimulatedAudioRecorder implements IAudioRecorder {
     // Start with a silent background or a default E2 pluck
     this.pluck(196.0); // G3 default
 
-    const bufferSize = 2048;
-    const intervalMs = (bufferSize / this.sampleRate) * 1000; // ~46.4ms
+    const bufferSize = 4096;
+    const intervalMs = (bufferSize / this.sampleRate) * 1000; // ~92.8ms
 
     this.intervalId = setInterval(() => {
       if (!this.state.isRecording || !this.onAudioDataCallback) return;

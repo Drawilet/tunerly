@@ -21,8 +21,8 @@ export class YinDetector {
   detect(buffer: Float32Array, sampleRate: number): YinResult {
     const bufferSize = buffer.length;
     
-    // Bounds for guitar frequencies (50Hz to 1200Hz)
-    const minFreq = 50;
+    // Bounds for instrument frequencies (30Hz to 1200Hz)
+    const minFreq = 30;
     const maxFreq = 1200;
     const minPeriod = Math.floor(sampleRate / maxFreq);
     const maxPeriod = Math.ceil(sampleRate / minFreq);

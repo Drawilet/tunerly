@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { useTheme } from '../hooks/useTheme';
+import { Fonts } from '@/constants/theme';
 
 interface PermissionGateProps {
   onRequestPermission: () => Promise<void>;
@@ -7,15 +9,17 @@ interface PermissionGateProps {
 }
 
 export function PermissionGate({ onRequestPermission, error }: PermissionGateProps) {
+  const theme = useTheme();
+
   return (
-    <View style={styles.container}>
-      <View style={styles.iconContainer}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.iconContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <Text style={styles.icon}>🎙️</Text>
       </View>
       
-      <Text style={styles.title}>Microphone Access Required</Text>
+      <Text style={[styles.title, { color: theme.text }]}>Microphone Access Required</Text>
       
-      <Text style={styles.description}>
+      <Text style={[styles.description, { color: theme.textTertiary }]}>
         Tunerly needs access to your microphone to listen to your instrument&apos;s frequency and help you tune it accurately.
       </Text>
 
@@ -26,7 +30,7 @@ export function PermissionGate({ onRequestPermission, error }: PermissionGatePro
       )}
 
       <TouchableOpacity 
-        style={styles.button} 
+        style={[styles.button, { backgroundColor: theme.accent }]} 
         onPress={onRequestPermission}
         activeOpacity={0.8}
       >
@@ -42,54 +46,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
-    backgroundColor: '#000000',
-    gap: 24,
+    gap: 20,
   },
   iconContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#16171D',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#1F2026',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   icon: {
     fontSize: 32,
   },
   title: {
     fontSize: 22,
-    color: '#FFFFFF',
     textAlign: 'center',
-    fontFamily: 'Outfit-Bold',
+    fontFamily: Fonts.bold,
   },
   description: {
     fontSize: 14,
-    color: '#8E919A',
     textAlign: 'center',
     lineHeight: 22,
     maxWidth: 280,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: Fonts.regular,
   },
   errorText: {
     fontSize: 12,
     color: '#FF453A',
     textAlign: 'center',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: Fonts.regular,
   },
   button: {
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#FFFFFF',
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: 32,
     marginTop: 12,
+    shadowColor: '#0285FD',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   buttonText: {
-    color: '#000000',
+    color: '#FFFFFF',
     fontSize: 15,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: Fonts.bold,
   },
 });

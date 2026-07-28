@@ -21,8 +21,8 @@ function runVerification() {
   console.log('==================================================');
 
   const sampleRate = 44100;
-  const bufferSize = 2048;
-  const detector = new YinDetector(0.15, bufferSize);
+  const bufferSize = 4096;
+  const detector = new YinDetector(0.15);
   const tuningNotes = GUITAR_STANDARD_TUNING.notes;
 
   const testCases = [

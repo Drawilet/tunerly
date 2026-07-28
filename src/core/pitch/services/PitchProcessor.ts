@@ -50,10 +50,10 @@ export class PitchProcessor {
     calibrationA4 = 440,
     confidenceThreshold = 0.5
   ): DetectedPitch | null {
-    // If frequency is invalid, outside standard guitar ranges, or confidence is too low, treat as no signal.
-    // 70Hz is flat E2 (82.4Hz), 1000Hz is sharp E4 (329.6Hz) with plenty of headroom.
+    // If frequency is invalid, outside standard instrument ranges, or confidence is too low, treat as no signal.
+    // 30Hz is flat D1 (36.7Hz) for Bass, 1000Hz is sharp E4/E5 with plenty of headroom.
     if (
-      frequency < 70 ||
+      frequency < 30 ||
       frequency > 1000 ||
       confidence < confidenceThreshold ||
       isNaN(frequency)

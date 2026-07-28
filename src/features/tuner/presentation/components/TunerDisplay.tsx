@@ -7,17 +7,23 @@ import Animated, {
   interpolate,
   Extrapolation,
   withTiming,
+  interpolateColor,
 } from 'react-native-reanimated';
 import { useTunerStore } from '../state/useTunerStore';
+import { useTheme } from '../hooks/useTheme';
+import { InstrumentIllustration } from './InstrumentIllustration';
+import { Fonts } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SCALE_WIDTH = Math.min(SCREEN_WIDTH - 64, 320);
+const SCALE_WIDTH = Math.min(SCREEN_WIDTH - 48, 330);
 const TICK_COUNT = 11; // -50 to +50 in steps of 10
 
 export function TunerDisplay() {
+  const theme = useTheme();
   const currentPitch = useTunerStore((s) => s.currentPitch);
   const lastValidNote = useTunerStore((s) => s.lastValidNote);
   const selectedNote = useTunerStore((s) => s.selectedNote);
+  const activeInstrument = useTunerStore((s) => s.activeInstrument);
 
   const centsShared = useSharedValue(0);
   const inTuneOpacity = useSharedValue(0);
@@ -27,8 +33,8 @@ export function TunerDisplay() {
     if (currentPitch) {
       // Spring needle animation
       centsShared.value = withSpring(currentPitch.cents, {
-        damping: 16,
-        stiffness: 90,
+        damping: 18,
+        stiffness: 100,
         mass: 0.8,
       });
 
@@ -41,29 +47,55 @@ export function TunerDisplay() {
     }
   }, [currentPitch, centsShared, inTuneOpacity]);
 
-  // Animated styles for the needle
+  // Animated style for the needle (movement + color change)
   const needleAnimatedStyle = useAnimatedStyle(() => {
     const translateX = interpolate(
       centsShared.value,
       [-50, 50],
-      [-SCALE_WIDTH / 2, SCALE_WIDTH / 2],
+      [-SCALE_WIDTH / 2 + 10, SCALE_WIDTH / 2 - 10],
       Extrapolation.CLAMP
+    );
+
+    const backgroundColor = interpolateColor(
+      inTuneOpacity.value,
+      [0, 1],
+      [theme.accent, theme.success]
     );
 
     return {
       transform: [{ translateX }],
+      backgroundColor,
     };
   });
 
-  // Animated style for the in-tune green glow effect
-  const glowAnimatedStyle = useAnimatedStyle(() => {
+  // Animated styles for the circular tuning ring wrapper
+  const ringAnimatedStyle = useAnimatedStyle(() => {
+    const borderColor = interpolateColor(
+      inTuneOpacity.value,
+      [0, 1],
+      [theme.accent, theme.success]
+    );
+
+    const shadowOpacity = interpolate(inTuneOpacity.value, [0, 1], [0.15, 0.45]);
+
     return {
-      opacity: inTuneOpacity.value,
-      transform: [
-        {
-          scale: interpolate(inTuneOpacity.value, [0, 1], [0.95, 1.02]),
-        },
-      ],
+      borderColor,
+      shadowColor: borderColor,
+      shadowOpacity,
+    };
+  });
+
+  // Animated style for the rotating indicator dot on the circular ring
+  const indicatorRotationStyle = useAnimatedStyle(() => {
+    const rotation = interpolate(
+      centsShared.value,
+      [-50, 50],
+      [-90, 90], // -90 deg (flat) to +90 deg (sharp)
+      Extrapolation.CLAMP
+    );
+
+    return {
+      transform: [{ rotate: `${rotation}deg` }],
     };
   });
 
@@ -87,7 +119,7 @@ export function TunerDisplay() {
     centsText = '--';
   }
 
-  // Render horizontal tick marks
+  // Render horizontal tick marks for Apple-like gauge
   const renderTicks = () => {
     const ticks = [];
     for (let i = 0; i < TICK_COUNT; i++) {
@@ -95,14 +127,19 @@ export function TunerDisplay() {
       const isCenter = centValue === 0;
       const isMajor = centValue % 20 === 0 || isCenter;
       
-      const leftPosition = (i / (TICK_COUNT - 1)) * SCALE_WIDTH;
+      const leftPosition = (i / (TICK_COUNT - 1)) * (SCALE_WIDTH - 20) + 10;
 
       ticks.push(
         <View
           key={centValue}
           style={[
             styles.tick,
-            { left: leftPosition },
+            {
+              left: leftPosition,
+              backgroundColor: isCenter
+                ? (currentPitch?.isInTune ? theme.success : theme.accent)
+                : (theme.isDark ? '#3A3A3C' : '#D1D1D6'),
+            },
             isCenter && styles.centerTick,
             isMajor && !isCenter && styles.majorTick,
           ]}
@@ -114,51 +151,130 @@ export function TunerDisplay() {
 
   return (
     <View style={styles.container}>
-      {/* Target/Current Note Display with In-Tune Glow Background */}
-      <View style={styles.noteContainer}>
-        <Animated.View style={[styles.glowBackground, glowAnimatedStyle]} />
-        <View style={styles.noteLabelWrapper}>
-          <Text style={[styles.noteText, currentPitch?.isInTune && styles.noteTextInTune]}>
-            {noteName}
-          </Text>
-          {octave !== '' && (
-            <Text style={[styles.octaveText, currentPitch?.isInTune && styles.noteTextInTune]}>
-              {octave}
-            </Text>
-          )}
-        </View>
-      </View>
-
-      {/* Cents and Frequency Indicators */}
-      <View style={styles.infoContainer}>
-        <Text style={[styles.centsText, currentPitch?.isInTune && styles.centsTextInTune]}>
-          {centsText !== '--' ? `${centsText} cents` : 'play a note'}
-        </Text>
-        <Text style={styles.frequencyText}>{frequencyText}</Text>
-      </View>
-
-      {/* Needle Scale Board */}
-      <View style={[styles.scaleContainer, { width: SCALE_WIDTH }]}>
-        {/* Tick Marks */}
-        <View style={styles.ticksWrapper}>{renderTicks()}</View>
-
-        {/* Labels (-50, 0, +50) */}
-        <View style={styles.labelsWrapper}>
-          <Text style={styles.scaleLabel}>♭</Text>
-          <Text style={[styles.scaleLabel, currentPitch?.isInTune && styles.scaleLabelInTune]}>
-            0
-          </Text>
-          <Text style={styles.scaleLabel}>♯</Text>
-        </View>
-
-        {/* The Animated Needle */}
+      {/* Upper Area: Circular Tuning Ring & Note Hero */}
+      <View style={styles.tuningRingWrapper}>
         <Animated.View
           style={[
-            styles.needle,
-            currentPitch?.isInTune ? styles.needleInTune : styles.needleDefault,
-            needleAnimatedStyle,
+            styles.tuningRing,
+            ringAnimatedStyle,
+            {
+              backgroundColor: theme.card,
+              shadowOffset: { width: 0, height: 4 },
+              shadowRadius: 10,
+              elevation: 4,
+            },
           ]}
-        />
+        >
+          {/* Rotating Indicator Dot Container */}
+          <Animated.View style={[styles.indicatorWrapper, indicatorRotationStyle]}>
+            <View
+              style={[
+                styles.indicatorDot,
+                {
+                  backgroundColor: currentPitch?.isInTune ? theme.success : theme.accent,
+                  shadowColor: currentPitch?.isInTune ? theme.success : theme.accent,
+                },
+              ]}
+            />
+          </Animated.View>
+
+          {/* Inner Content */}
+          <View style={styles.noteContent}>
+            <Text style={[styles.instrumentLabel, { color: theme.textTertiary }]}>
+              {activeInstrument.name.toUpperCase()}
+            </Text>
+            
+            <View style={styles.noteLabelWrapper}>
+              <Text
+                style={[
+                  styles.noteText,
+                  {
+                    color: currentPitch?.isInTune ? theme.success : theme.text,
+                  },
+                ]}
+              >
+                {noteName}
+              </Text>
+              {octave !== '' && (
+                <Text
+                  style={[
+                    styles.octaveText,
+                    {
+                      color: currentPitch?.isInTune ? theme.success : theme.textTertiary,
+                    },
+                  ]}
+                >
+                  {octave}
+                </Text>
+              )}
+            </View>
+
+            <Text style={[styles.frequencyText, { color: theme.textSecondary }]}>
+              {frequencyText}
+            </Text>
+          </View>
+        </Animated.View>
+      </View>
+
+      {/* Middle Area: Dynamic Vector Instrument Headstock */}
+      <View style={styles.illustrationContainer}>
+        <InstrumentIllustration instrumentId={activeInstrument.id} />
+      </View>
+
+      {/* Lower Area: Refreshed Gauge Scale (Apple-style rounded Card) */}
+      <View
+        style={[
+          styles.scaleCard,
+          {
+            width: SCALE_WIDTH,
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: theme.isDark ? 0 : 0.05,
+            shadowRadius: 12,
+            elevation: 3,
+          },
+        ]}
+      >
+        <View style={styles.scaleHeader}>
+          <Text
+            style={[
+              styles.centsLabel,
+              {
+                color: currentPitch?.isInTune ? theme.success : theme.textSecondary,
+                fontFamily: currentPitch?.isInTune ? Fonts.bold : Fonts.semiBold,
+              },
+            ]}
+          >
+            {centsText !== '--' ? `${centsText} cents` : 'play a note'}
+          </Text>
+        </View>
+
+        {/* The Gauge Board */}
+        <View style={styles.scaleBoard}>
+          {/* Ticks */}
+          <View style={styles.ticksWrapper}>{renderTicks()}</View>
+
+          {/* Labels (-50, 0, +50) */}
+          <View style={styles.labelsWrapper}>
+            <Text style={[styles.scaleLabel, { color: theme.textTertiary }]}>♭</Text>
+            <Text
+              style={[
+                styles.scaleLabel,
+                {
+                  color: currentPitch?.isInTune ? theme.success : theme.textTertiary,
+                  fontFamily: currentPitch?.isInTune ? Fonts.bold : Fonts.regular,
+                },
+              ]}
+            >
+              0
+            </Text>
+            <Text style={[styles.scaleLabel, { color: theme.textTertiary }]}>♯</Text>
+          </View>
+
+          {/* The Animated Sweeping Needle */}
+          <Animated.View style={[styles.needle, needleAnimatedStyle]} />
+        </View>
       </View>
     </View>
   );
@@ -168,124 +284,131 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
-    gap: 32,
+    gap: 20,
+    width: '100%',
   },
-  noteContainer: {
+  tuningRingWrapper: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 180,
+  },
+  tuningRing: {
     width: 160,
     height: 160,
     borderRadius: 80,
-    alignItems: 'center',
+    borderWidth: 3.5,
     justifyContent: 'center',
-    backgroundColor: '#0D0E11',
-    borderWidth: 1,
-    borderColor: '#1F2026',
+    alignItems: 'center',
     position: 'relative',
-    overflow: 'hidden',
   },
-  glowBackground: {
+  indicatorWrapper: {
     position: 'absolute',
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderRadius: 80,
-    borderColor: '#10B981',
-    borderWidth: 2,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  indicatorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    top: -7.5,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  noteContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+  },
+  instrumentLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bold,
+    letterSpacing: 1.5,
   },
   noteLabelWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   noteText: {
-    fontSize: 76,
-    color: '#FFFFFF',
-    fontFamily: 'Outfit-Bold',
-  },
-  noteTextInTune: {
-    color: '#10B981',
-    textShadowColor: 'rgba(16, 185, 129, 0.5)',
-    textShadowRadius: 10,
+    fontSize: 56,
+    fontFamily: Fonts.bold,
+    lineHeight: 64,
   },
   octaveText: {
-    fontSize: 24,
-    color: '#8E919A',
-    marginTop: 12,
-    fontFamily: 'Outfit-SemiBold',
-  },
-  infoContainer: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  centsText: {
     fontSize: 18,
-    color: '#8E919A',
-    textTransform: 'lowercase',
-    fontFamily: 'Outfit-SemiBold',
-  },
-  centsTextInTune: {
-    color: '#10B981',
+    fontFamily: Fonts.bold,
+    marginTop: 6,
   },
   frequencyText: {
-    fontSize: 14,
-    fontFamily: 'Outfit-Regular',
-    color: '#555861',
+    fontSize: 13,
+    fontFamily: Fonts.semiBold,
+    letterSpacing: 0.3,
   },
-  scaleContainer: {
-    height: 60,
+  illustrationContainer: {
+    height: 180,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scaleCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  scaleHeader: {
+    alignItems: 'center',
+  },
+  centsLabel: {
+    fontSize: 14,
+    textTransform: 'lowercase',
+  },
+  scaleBoard: {
+    height: 52,
     position: 'relative',
-    marginTop: 20,
+    justifyContent: 'center',
   },
   ticksWrapper: {
-    height: 20,
+    height: 16,
     position: 'relative',
     width: '100%',
   },
   tick: {
     position: 'absolute',
     width: 1,
-    height: 8,
-    backgroundColor: '#2E313A',
+    height: 6,
     bottom: 0,
   },
   majorTick: {
-    height: 12,
-    backgroundColor: '#555861',
+    height: 10,
   },
   centerTick: {
-    width: 2,
-    height: 18,
-    backgroundColor: '#8E919A',
+    width: 2.5,
+    height: 14,
+    borderRadius: 1,
   },
   labelsWrapper: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
-    paddingHorizontal: 4,
+    marginTop: 6,
+    paddingHorizontal: 10,
   },
   scaleLabel: {
-    fontSize: 12,
-    color: '#555861',
-    fontFamily: 'Outfit-Regular',
-  },
-  scaleLabelInTune: {
-    color: '#10B981',
+    fontSize: 11,
   },
   needle: {
     position: 'absolute',
-    width: 2,
-    height: 40,
-    top: -10,
+    width: 2.5,
+    height: 36,
+    top: -14,
     left: '50%',
-    marginLeft: -1,
-  },
-  needleDefault: {
-    backgroundColor: '#007AFF', // Premium blue for normal state
-  },
-  needleInTune: {
-    backgroundColor: '#10B981', // Emerald green when in tune
-    shadowColor: '#10B981',
-    shadowRadius: 4,
-    shadowOpacity: 0.8,
+    marginLeft: -1.25,
+    borderRadius: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
 });

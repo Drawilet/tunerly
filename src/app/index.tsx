@@ -5,11 +5,16 @@ import { useTuner } from '@/features/tuner/presentation/hooks/useTuner';
 import { useTunerStore } from '@/features/tuner/presentation/state/useTunerStore';
 import { TunerDisplay } from '@/features/tuner/presentation/components/TunerDisplay';
 import { StringSelector } from '@/features/tuner/presentation/components/StringSelector';
+import { InstrumentSelector } from '@/features/tuner/presentation/components/InstrumentSelector';
+import { TuningSelector } from '@/features/tuner/presentation/components/TuningSelector';
 import { PermissionGate } from '@/features/tuner/presentation/components/PermissionGate';
+import { useTheme } from '@/features/tuner/presentation/hooks/useTheme';
+import { Fonts } from '@/constants/theme';
 
 const queryClient = new QueryClient();
 
 function TunerScreen() {
+  const theme = useTheme();
   const { startTuning, stopTuning } = useTuner();
   const microphonePermission = useTunerStore((s) => s.microphonePermission);
 
@@ -24,23 +29,32 @@ function TunerScreen() {
   // If permission is explicitly denied, show the permission request gate
   if (microphonePermission === false) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
         <PermissionGate onRequestPermission={startTuning} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
       
       {/* Brand Header */}
       <View style={styles.header}>
-        <Text style={styles.brandTitle}>TUNERLY</Text>
-        <Text style={styles.brandSubtitle}>chromatic pitch tool</Text>
+        <Text style={[styles.brandTitle, { color: theme.text }]}>TUNERLY</Text>
+        <Text style={[styles.brandSubtitle, { color: theme.textTertiary }]}>chromatic tuner</Text>
       </View>
 
-      {/* Main Tuner Dial/Needle Area */}
+      {/* Selectors Panel (Instrument + Tuning) */}
+      <View style={styles.selectorsPanel}>
+        <InstrumentSelector />
+        <TuningSelector />
+      </View>
+
+      {/* Main Tuner Illustration & Gauge Dial */}
       <View style={styles.tunerWrapper}>
         <TunerDisplay />
       </View>
@@ -54,9 +68,11 @@ function TunerScreen() {
 }
 
 export default function HomeScreen() {
+  const theme = useTheme();
+
   return (
     <QueryClientProvider client={queryClient}>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <TunerScreen />
       </View>
     </QueryClientProvider>
@@ -66,38 +82,43 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#000000',
     paddingTop: Platform.OS === 'android' ? 40 : 0,
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   header: {
     alignItems: 'center',
-    marginTop: 24,
-    gap: 4,
+    marginTop: 16,
+    gap: 2,
   },
   brandTitle: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    letterSpacing: 8,
-    fontFamily: 'Outfit-Bold',
+    fontSize: 15,
+    letterSpacing: 6,
+    fontFamily: Fonts.bold,
   },
   brandSubtitle: {
-    fontSize: 10,
-    color: '#3E414C',
-    letterSpacing: 2,
+    fontSize: 9,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: Fonts.semiBold,
+  },
+  selectorsPanel: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
   },
   tunerWrapper: {
     flex: 1,
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
   selectorWrapper: {
-    paddingBottom: 48,
+    width: '100%',
+    paddingBottom: Platform.OS === 'ios' ? 8 : 24,
   },
 });

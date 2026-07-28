@@ -81,8 +81,8 @@ export class WebAudioRecorder implements IAudioRecorder {
 
       const source = this.audioContext.createMediaStreamSource(this.stream);
       this.analyser = this.audioContext.createAnalyser();
-      // Use 2048 or 4096 samples. 2048 at 44.1kHz is ~46ms, which is perfect for real-time.
-      this.analyser.fftSize = 2048;
+      // Use 4096 samples to support low frequencies down to 30Hz (Bass)
+      this.analyser.fftSize = 4096;
 
       source.connect(this.analyser);
 

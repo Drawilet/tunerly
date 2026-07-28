@@ -5,6 +5,7 @@ import { YinDetector } from '@/core/pitch/algorithms/yin';
 import { PitchProcessor } from '@/core/pitch/services/PitchProcessor';
 import { PitchFilter } from '../../../../core/pitch/services/PitchFilter';
 import { StringNote } from '../../domain/models/TunerModels';
+import { HapticsService } from '@/core/haptics/services/HapticsService';
 
 /**
  * Calculates the Root Mean Square (RMS) amplitude of a PCM audio buffer.
@@ -40,6 +41,7 @@ export function useTuner() {
 
   // Note Lock state to prevent note-drifting during decay/low-SNR phases
   const lockedNoteRef = useRef<StringNote | null>(null);
+  const wasInTuneRef = useRef(false);
 
   // Refs to keep callbacks stable without resetting recording streams
   const activeTuningRef = useRef(activeTuning);
@@ -72,14 +74,15 @@ export function useTuner() {
       pitchFilter.current.reset();
       setCurrentPitch(null);
       lockedNoteRef.current = null; // Clear lock on silence
+      wasInTuneRef.current = false;
       return;
     }
 
     // 3. Detect Pitch
     const yinResult = detector.current.detect(buffer, recorder.current.sampleRate);
     
-    // 4. Check confidence and valid guitar frequency range [70Hz, 1000Hz]
-    if (yinResult.frequency >= 70 && yinResult.frequency <= 1000 && yinResult.confidence >= 0.35) {
+    // 4. Check confidence and valid instrument frequency range [30Hz, 1000Hz]
+    if (yinResult.frequency >= 30 && yinResult.frequency <= 1000 && yinResult.confidence >= 0.35) {
       // Apply rolling Median + EMA smoothing
       const smoothedFreq = pitchFilter.current.filter(yinResult.frequency);
 
@@ -115,16 +118,28 @@ export function useTuner() {
           calibrationA4Ref.current,
           0.35
         );
+        
         setCurrentPitch(pitchResult);
+
+        if (pitchResult && pitchResult.isInTune) {
+          if (!wasInTuneRef.current) {
+            HapticsService.notificationSuccess();
+            wasInTuneRef.current = true;
+          }
+        } else {
+          wasInTuneRef.current = false;
+        }
       } else {
         // Out-of-band jump while signal is weak: treat as noise/decay tail
         pitchFilter.current.reset();
         setCurrentPitch(null);
+        wasInTuneRef.current = false;
       }
     } else {
       // No clear frequency detected
       pitchFilter.current.reset();
       setCurrentPitch(null);
+      wasInTuneRef.current = false;
     }
   }, [setCurrentPitch]);
 

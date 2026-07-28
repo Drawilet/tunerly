@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider, Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
@@ -13,13 +13,22 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   const [fontsLoaded, fontError] = useFonts({
-    'Outfit-Regular': require('../../assets/fonts/Outfit-Regular.ttf'),
-    'Outfit-SemiBold': require('../../assets/fonts/Outfit-SemiBold.ttf'),
-    'Outfit-Bold': require('../../assets/fonts/Outfit-Bold.ttf'),
+    'Inter-Regular': require('../../assets/fonts/Inter-Regular.ttf'),
+    'Inter-SemiBold': require('../../assets/fonts/Inter-SemiBold.ttf'),
+    'Inter-Bold': require('../../assets/fonts/Inter-Bold.ttf'),
   });
 
-  // Once fonts are loaded or an error occurs, the splash overlay layout will trigger the native hide
-  if (!fontsLoaded && !fontError) {
+  useEffect(() => {
+    if (fontsLoaded) {
+      console.log('Successfully loaded custom font families: Inter-Regular, Inter-SemiBold, Inter-Bold');
+    }
+    if (fontError) {
+      console.error('Failed to load custom fonts:', fontError);
+    }
+  }, [fontsLoaded, fontError]);
+
+  // The application should never render until the fonts are fully loaded
+  if (!fontsLoaded) {
     return null;
   }
 
