@@ -1,98 +1,103 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect } from 'react';
+import { StyleSheet, View, Text, StatusBar, SafeAreaView, Platform } from 'react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useTuner } from '@/features/tuner/presentation/hooks/useTuner';
+import { useTunerStore } from '@/features/tuner/presentation/state/useTunerStore';
+import { TunerDisplay } from '@/features/tuner/presentation/components/TunerDisplay';
+import { StringSelector } from '@/features/tuner/presentation/components/StringSelector';
+import { PermissionGate } from '@/features/tuner/presentation/components/PermissionGate';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+const queryClient = new QueryClient();
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
+function TunerScreen() {
+  const { startTuning, stopTuning } = useTuner();
+  const microphonePermission = useTunerStore((s) => s.microphonePermission);
+
+  // Auto-start listening on screen mount
+  useEffect(() => {
+    startTuning();
+    return () => {
+      stopTuning();
+    };
+  }, [startTuning, stopTuning]);
+
+  // If permission is explicitly denied, show the permission request gate
+  if (microphonePermission === false) {
     return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
+      <SafeAreaView style={styles.safeArea}>
+        <PermissionGate onRequestPermission={startTuning} />
+      </SafeAreaView>
     );
   }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      
+      {/* Brand Header */}
+      <View style={styles.header}>
+        <Text style={styles.brandTitle}>TUNERLY</Text>
+        <Text style={styles.brandSubtitle}>chromatic pitch tool</Text>
+      </View>
+
+      {/* Main Tuner Dial/Needle Area */}
+      <View style={styles.tunerWrapper}>
+        <TunerDisplay />
+      </View>
+
+      {/* String Selection / Action Panel */}
+      <View style={styles.selectorWrapper}>
+        <StringSelector />
+      </View>
+    </SafeAreaView>
   );
 }
 
 export default function HomeScreen() {
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+    <QueryClientProvider client={queryClient}>
+      <View style={styles.container}>
+        <TunerScreen />
+      </View>
+    </QueryClientProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: '#000000',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
+    backgroundColor: '#000000',
+    paddingTop: Platform.OS === 'android' ? 40 : 0,
+    justifyContent: 'space-between',
+  },
+  header: {
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    marginTop: 24,
+    gap: 4,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+  brandTitle: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    letterSpacing: 8,
+    fontFamily: 'Outfit-Bold',
   },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
+  brandSubtitle: {
+    fontSize: 10,
+    color: '#3E414C',
+    letterSpacing: 2,
     textTransform: 'uppercase',
+    fontFamily: 'Outfit-SemiBold',
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  tunerWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectorWrapper: {
+    paddingBottom: 48,
   },
 });
