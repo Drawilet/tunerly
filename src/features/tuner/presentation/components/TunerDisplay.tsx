@@ -21,9 +21,9 @@ const TICK_COUNT = 11; // -50 to +50 in steps of 10
 export function TunerDisplay() {
   const theme = useTheme();
   const currentPitch = useTunerStore((s) => s.currentPitch);
-  const lastValidNote = useTunerStore((s) => s.lastValidNote);
   const selectedNote = useTunerStore((s) => s.selectedNote);
   const activeInstrument = useTunerStore((s) => s.activeInstrument);
+  const isCalibrating = useTunerStore((s) => s.isCalibrating);
 
   const centsShared = useSharedValue(0);
   const inTuneOpacity = useSharedValue(0);
@@ -100,9 +100,17 @@ export function TunerDisplay() {
   });
 
   // Dynamic note name and frequency display
-  const noteName = currentPitch?.noteName ?? lastValidNote?.noteName ?? selectedNote?.name ?? '-';
-  const octave = currentPitch?.octave ?? lastValidNote?.octave ?? selectedNote?.octave ?? '';
-  const frequencyText = currentPitch ? `${currentPitch.frequency.toFixed(1)} Hz` : '--.- Hz';
+  const noteName = isCalibrating
+    ? 'CAL'
+    : (currentPitch ? currentPitch.noteName : (selectedNote ? selectedNote.name : '-'));
+  
+  const octave = isCalibrating
+    ? ''
+    : (currentPitch ? currentPitch.octave.toString() : (selectedNote ? selectedNote.octave.toString() : ''));
+
+  const frequencyText = isCalibrating
+    ? 'estimating noise...'
+    : (currentPitch ? `${currentPitch.frequency.toFixed(1)} Hz` : '--.- Hz');
 
   // Dynamic cents difference text
   let centsText = '';
@@ -241,12 +249,16 @@ export function TunerDisplay() {
             style={[
               styles.centsLabel,
               {
-                color: currentPitch?.isInTune ? theme.success : theme.textSecondary,
-                fontFamily: currentPitch?.isInTune ? Fonts.bold : Fonts.semiBold,
+                color: isCalibrating
+                  ? '#FF9500'
+                  : (currentPitch?.isInTune ? theme.success : theme.textSecondary),
+                fontFamily: isCalibrating || currentPitch?.isInTune ? Fonts.bold : Fonts.semiBold,
               },
             ]}
           >
-            {centsText !== '--' ? `${centsText} cents` : 'play a note'}
+            {isCalibrating
+              ? 'calibrating noise floor...'
+              : (currentPitch ? `${centsText} cents` : 'play a note')}
           </Text>
         </View>
 

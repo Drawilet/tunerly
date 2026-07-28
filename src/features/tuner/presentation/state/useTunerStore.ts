@@ -8,6 +8,16 @@ import {
 } from '../../domain/models/TunerModels';
 import { DetectedPitch } from '@/core/pitch/services/PitchProcessor';
 
+export interface DebugData {
+  rms: number;
+  frequency: number;
+  confidence: number;
+  stableFrames: number;
+  noiseFloor: number;
+  currentThreshold: number;
+  state: 'calibrating' | 'silence' | 'lowconfidence' | 'outofbounds' | 'unstable' | 'accepted';
+}
+
 interface TunerState {
   activeInstrument: Instrument;
   activeTuning: Tuning;
@@ -17,7 +27,16 @@ interface TunerState {
   isRecording: boolean;
   microphonePermission: boolean | null;
   calibrationA4: number;
-  amplitudeThreshold: number; // RMS noise gate threshold
+  amplitudeThreshold: number; // base dynamic fallback threshold
+  
+  // Calibration states
+  isCalibrating: boolean;
+  noiseFloor: number;
+  calibratedThreshold: number;
+
+  // Debug overlay states
+  showDebug: boolean;
+  debugData: DebugData;
 
   setInstrument: (instrument: Instrument) => void;
   setTuning: (tuning: Tuning) => void;
@@ -27,6 +46,10 @@ interface TunerState {
   setPermission: (hasPermission: boolean | null) => void;
   setCalibration: (a4: number) => void;
   setAmplitudeThreshold: (threshold: number) => void;
+  setIsCalibrating: (isCalibrating: boolean) => void;
+  setNoiseFloor: (floor: number, threshold: number) => void;
+  setShowDebug: (show: boolean) => void;
+  setDebugData: (data: Partial<DebugData>) => void;
   resetTuner: () => void;
 }
 
@@ -39,7 +62,22 @@ export const useTunerStore = create<TunerState>((set) => ({
   isRecording: false,
   microphonePermission: null,
   calibrationA4: 440,
-  amplitudeThreshold: 0.03, // Noise gate threshold (RMS) set to 0.03 to filter low-SNR decay tails
+  amplitudeThreshold: 0.03, // Base fallback threshold (RMS)
+  
+  isCalibrating: false,
+  noiseFloor: 0.0,
+  calibratedThreshold: 0.03,
+
+  showDebug: false,
+  debugData: {
+    rms: 0,
+    frequency: 0,
+    confidence: 0,
+    stableFrames: 0,
+    noiseFloor: 0,
+    currentThreshold: 0.03,
+    state: 'silence',
+  },
 
   setInstrument: (activeInstrument) =>
     set({
@@ -59,7 +97,6 @@ export const useTunerStore = create<TunerState>((set) => ({
   setSelectedNote: (selectedNote) =>
     set({
       selectedNote,
-      // Clear current pitch to prevent needle jumping from previous note selection
       currentPitch: null,
     }),
   setCurrentPitch: (currentPitch) =>
@@ -77,11 +114,21 @@ export const useTunerStore = create<TunerState>((set) => ({
   setPermission: (microphonePermission) => set({ microphonePermission }),
   setCalibration: (calibrationA4) => set({ calibrationA4 }),
   setAmplitudeThreshold: (amplitudeThreshold) => set({ amplitudeThreshold }),
+  setIsCalibrating: (isCalibrating) => set({ isCalibrating }),
+  setNoiseFloor: (noiseFloor, calibratedThreshold) => set({ noiseFloor, calibratedThreshold }),
+  setShowDebug: (showDebug) => set({ showDebug }),
+  setDebugData: (data) =>
+    set((state) => ({
+      debugData: { ...state.debugData, ...data },
+    })),
   resetTuner: () =>
     set({
       selectedNote: null,
       currentPitch: null,
       lastValidNote: null,
       isRecording: false,
+      isCalibrating: false,
+      noiseFloor: 0,
+      calibratedThreshold: 0.03,
     }),
 }));

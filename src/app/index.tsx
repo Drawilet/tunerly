@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View, Text, StatusBar, SafeAreaView, Platform } from 'react-native';
+import { StyleSheet, View, Text, StatusBar, SafeAreaView, Platform, TouchableOpacity } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTuner } from '@/features/tuner/presentation/hooks/useTuner';
 import { useTunerStore } from '@/features/tuner/presentation/state/useTunerStore';
@@ -10,6 +10,7 @@ import { TuningSelector } from '@/features/tuner/presentation/components/TuningS
 import { PermissionGate } from '@/features/tuner/presentation/components/PermissionGate';
 import { useTheme } from '@/features/tuner/presentation/hooks/useTheme';
 import { Fonts } from '@/constants/theme';
+import { DebugOverlay } from '@/features/tuner/presentation/components/DebugOverlay';
 
 const queryClient = new QueryClient();
 
@@ -17,6 +18,8 @@ function TunerScreen() {
   const theme = useTheme();
   const { startTuning, stopTuning } = useTuner();
   const microphonePermission = useTunerStore((s) => s.microphonePermission);
+  const showDebug = useTunerStore((s) => s.showDebug);
+  const setShowDebug = useTunerStore((s) => s.setShowDebug);
 
   // Auto-start listening on screen mount
   useEffect(() => {
@@ -46,6 +49,16 @@ function TunerScreen() {
       <View style={styles.header}>
         <Text style={[styles.brandTitle, { color: theme.text }]}>TUNERLY</Text>
         <Text style={[styles.brandSubtitle, { color: theme.textTertiary }]}>chromatic tuner</Text>
+        
+        <TouchableOpacity
+          style={[styles.debugToggle, { borderColor: theme.border }]}
+          onPress={() => setShowDebug(!showDebug)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.debugToggleText, { color: showDebug ? theme.accent : theme.textTertiary }]}>
+            DEBUG
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Selectors Panel (Instrument + Tuning) */}
@@ -63,6 +76,8 @@ function TunerScreen() {
       <View style={styles.selectorWrapper}>
         <StringSelector />
       </View>
+
+      <DebugOverlay />
     </SafeAreaView>
   );
 }
@@ -93,6 +108,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
     gap: 2,
+    width: '100%',
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  debugToggle: {
+    position: 'absolute',
+    right: 20,
+    top: 6,
+    borderWidth: 0.5,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  debugToggleText: {
+    fontSize: 9,
+    fontFamily: Fonts.bold,
   },
   brandTitle: {
     fontSize: 15,
