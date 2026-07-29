@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View, Text, StatusBar, SafeAreaView, Platform, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, StatusBar, TouchableOpacity } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTuner } from '@/features/tuner/presentation/hooks/useTuner';
 import { useTunerStore } from '@/features/tuner/presentation/state/useTunerStore';
@@ -11,6 +11,7 @@ import { PermissionGate } from '@/features/tuner/presentation/components/Permiss
 import { useTheme } from '@/features/tuner/presentation/hooks/useTheme';
 import { Fonts } from '@/constants/theme';
 import { DebugOverlay } from '@/features/tuner/presentation/components/DebugOverlay';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,7 @@ function TunerScreen() {
   const microphonePermission = useTunerStore((s) => s.microphonePermission);
   const showDebug = useTunerStore((s) => s.showDebug);
   const setShowDebug = useTunerStore((s) => s.setShowDebug);
+  const { insets, isTablet, contentMaxWidth, spacing } = useResponsive();
 
   // Auto-start listening on screen mount
   useEffect(() => {
@@ -32,53 +34,89 @@ function TunerScreen() {
   // If permission is explicitly denied, show the permission request gate
   if (microphonePermission === false) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            paddingTop: insets.top + spacing.md,
+            paddingBottom: insets.bottom + spacing.md,
+            paddingLeft: insets.left + spacing.md,
+            paddingRight: insets.right + spacing.md,
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
+        ]}
+      >
         <PermissionGate onRequestPermission={startTuning} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.background,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left + spacing.md,
+          paddingRight: insets.right + spacing.md,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+      ]}
+    >
       <StatusBar
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
       />
       
-      {/* Brand Header */}
-      <View style={styles.header}>
-        <Text style={[styles.brandTitle, { color: theme.text }]}>TUNERLY</Text>
-        <Text style={[styles.brandSubtitle, { color: theme.textTertiary }]}>chromatic tuner</Text>
-        
-        <TouchableOpacity
-          style={[styles.debugToggle, { borderColor: theme.border }]}
-          onPress={() => setShowDebug(!showDebug)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.debugToggleText, { color: showDebug ? theme.accent : theme.textTertiary }]}>
-            DEBUG
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <View
+        style={{
+          flex: 1,
+          width: '100%',
+          maxWidth: isTablet ? contentMaxWidth : '100%',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        {/* Brand Header */}
+        <View style={styles.header}>
+          <Text style={[styles.brandTitle, { color: theme.text }]}>TUNERLY</Text>
+          <Text style={[styles.brandSubtitle, { color: theme.textTertiary }]}>chromatic tuner</Text>
+          
+          <TouchableOpacity
+            style={[styles.debugToggle, { borderColor: theme.border }]}
+            onPress={() => setShowDebug(!showDebug)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.debugToggleText, { color: showDebug ? theme.accent : theme.textTertiary }]}>
+              DEBUG
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Selectors Panel (Instrument + Tuning) */}
-      <View style={styles.selectorsPanel}>
-        <InstrumentSelector />
-        <TuningSelector />
-      </View>
+        {/* Selectors Panel (Instrument + Tuning) */}
+        <View style={styles.selectorsPanel}>
+          <InstrumentSelector />
+          <TuningSelector />
+        </View>
 
-      {/* Main Tuner Illustration & Gauge Dial */}
-      <View style={styles.tunerWrapper}>
-        <TunerDisplay />
-      </View>
+        {/* Main Tuner Illustration & Gauge Dial */}
+        <View style={styles.tunerWrapper}>
+          <TunerDisplay />
+        </View>
 
-      {/* String Selection / Action Panel */}
-      <View style={styles.selectorWrapper}>
-        <StringSelector />
+        {/* String Selection / Action Panel */}
+        <View style={styles.selectorWrapper}>
+          <StringSelector />
+        </View>
       </View>
 
       <DebugOverlay />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -98,15 +136,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  safeArea: {
-    flex: 1,
-    paddingTop: Platform.OS === 'android' ? 40 : 0,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   header: {
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 8,
     gap: 2,
     width: '100%',
     position: 'relative',
@@ -140,7 +172,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     gap: 8,
-    marginTop: 8,
+    marginTop: 4,
   },
   tunerWrapper: {
     flex: 1,
@@ -150,6 +182,6 @@ const styles = StyleSheet.create({
   },
   selectorWrapper: {
     width: '100%',
-    paddingBottom: Platform.OS === 'ios' ? 8 : 24,
+    paddingBottom: 8,
   },
 });

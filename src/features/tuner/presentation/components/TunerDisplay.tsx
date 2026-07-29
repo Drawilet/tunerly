@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Text, Dimensions } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,9 +13,8 @@ import { useTunerStore } from '../state/useTunerStore';
 import { useTheme } from '../hooks/useTheme';
 import { InstrumentIllustration } from './InstrumentIllustration';
 import { Fonts } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SCALE_WIDTH = Math.min(SCREEN_WIDTH - 48, 330);
 const TICK_COUNT = 11; // -50 to +50 in steps of 10
 
 export function TunerDisplay() {
@@ -24,6 +23,18 @@ export function TunerDisplay() {
   const selectedNote = useTunerStore((s) => s.selectedNote);
   const activeInstrument = useTunerStore((s) => s.activeInstrument);
   const isCalibrating = useTunerStore((s) => s.isCalibrating);
+  const lastValidNote = useTunerStore((s) => s.lastValidNote);
+
+  const { isCompact, isTablet, spacing, width } = useResponsive();
+  const SCALE_WIDTH = Math.min(width - spacing.md * 2, isTablet ? 400 : 330);
+
+  const ringSize = isCompact ? 120 : (isTablet ? 185 : 160);
+  const ringWrapperHeight = isCompact ? 130 : (isTablet ? 200 : 180);
+  const noteFontSize = isCompact ? 40 : (isTablet ? 64 : 56);
+  const octaveFontSize = isCompact ? 14 : (isTablet ? 22 : 18);
+  const illustrationHeight = isCompact ? 100 : (isTablet ? 200 : 160);
+  const dotSize = isCompact ? 10 : 12;
+  const borderWidth = 3.5;
 
   const centsShared = useSharedValue(0);
   const inTuneOpacity = useSharedValue(0);
@@ -102,11 +113,19 @@ export function TunerDisplay() {
   // Dynamic note name and frequency display
   const noteName = isCalibrating
     ? 'CAL'
-    : (currentPitch ? currentPitch.noteName : (selectedNote ? selectedNote.name : '-'));
+    : (currentPitch
+        ? currentPitch.noteName
+        : (lastValidNote
+            ? lastValidNote.noteName
+            : (selectedNote ? selectedNote.name : '-')));
   
   const octave = isCalibrating
     ? ''
-    : (currentPitch ? currentPitch.octave.toString() : (selectedNote ? selectedNote.octave.toString() : ''));
+    : (currentPitch
+        ? currentPitch.octave.toString()
+        : (lastValidNote
+            ? lastValidNote.octave.toString()
+            : (selectedNote ? selectedNote.octave.toString() : '')));
 
   const frequencyText = isCalibrating
     ? 'estimating noise...'
@@ -160,12 +179,16 @@ export function TunerDisplay() {
   return (
     <View style={styles.container}>
       {/* Upper Area: Circular Tuning Ring & Note Hero */}
-      <View style={styles.tuningRingWrapper}>
+      <View style={[styles.tuningRingWrapper, { height: ringWrapperHeight }]}>
         <Animated.View
           style={[
             styles.tuningRing,
             ringAnimatedStyle,
             {
+              width: ringSize,
+              height: ringSize,
+              borderRadius: ringSize / 2,
+              borderWidth: borderWidth,
               backgroundColor: theme.card,
               shadowOffset: { width: 0, height: 4 },
               shadowRadius: 10,
@@ -181,6 +204,10 @@ export function TunerDisplay() {
                 {
                   backgroundColor: currentPitch?.isInTune ? theme.success : theme.accent,
                   shadowColor: currentPitch?.isInTune ? theme.success : theme.accent,
+                  width: dotSize,
+                  height: dotSize,
+                  borderRadius: dotSize / 2,
+                  top: - (dotSize / 2 + borderWidth / 2),
                 },
               ]}
             />
@@ -198,6 +225,8 @@ export function TunerDisplay() {
                   styles.noteText,
                   {
                     color: currentPitch?.isInTune ? theme.success : theme.text,
+                    fontSize: noteFontSize,
+                    lineHeight: noteFontSize + 8,
                   },
                 ]}
               >
@@ -209,6 +238,7 @@ export function TunerDisplay() {
                     styles.octaveText,
                     {
                       color: currentPitch?.isInTune ? theme.success : theme.textTertiary,
+                      fontSize: octaveFontSize,
                     },
                   ]}
                 >
@@ -225,8 +255,10 @@ export function TunerDisplay() {
       </View>
 
       {/* Middle Area: Dynamic Vector Instrument Headstock */}
-      <View style={styles.illustrationContainer}>
-        <InstrumentIllustration instrumentId={activeInstrument.id} />
+      <View style={[styles.illustrationContainer, { height: illustrationHeight }]}>
+        <View style={{ transform: [{ scale: isCompact ? 0.65 : (isTablet ? 1.15 : 1.0) }] }}>
+          <InstrumentIllustration instrumentId={activeInstrument.id} />
+        </View>
       </View>
 
       {/* Lower Area: Refreshed Gauge Scale (Apple-style rounded Card) */}

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,14 +10,15 @@ import { SUPPORTED_INSTRUMENTS, Instrument } from '../../domain/models/TunerMode
 import { useTheme } from '../hooks/useTheme';
 import { HapticsService } from '@/core/haptics/services/HapticsService';
 import { Fonts } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export function InstrumentSelector() {
   const theme = useTheme();
   const { activeInstrument, setInstrument } = useTunerStore();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, spacing } = useResponsive();
 
   // Define total control width based on screen width
-  const containerWidth = Math.min(windowWidth - 32, 360);
+  const containerWidth = Math.min(windowWidth - spacing.md * 2, 360);
   const tabWidth = (containerWidth - 6) / 4; // 4 items, 3px padding on each side
 
   // Find active index

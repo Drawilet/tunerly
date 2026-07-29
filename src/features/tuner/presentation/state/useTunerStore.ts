@@ -23,7 +23,7 @@ interface TunerState {
   activeTuning: Tuning;
   selectedNote: StringNote | null; // null means auto-detect string
   currentPitch: DetectedPitch | null;
-  lastValidNote: { noteName: string; octave: number } | null;
+  lastValidNote: { noteName: string; octave: number; targetNote: StringNote } | null;
   isRecording: boolean;
   microphonePermission: boolean | null;
   calibrationA4: number;
@@ -106,6 +106,7 @@ export const useTunerStore = create<TunerState>((set) => ({
         updates.lastValidNote = {
           noteName: currentPitch.noteName,
           octave: currentPitch.octave,
+          targetNote: currentPitch.targetNote,
         };
       }
       return updates;

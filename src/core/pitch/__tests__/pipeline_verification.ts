@@ -122,7 +122,10 @@ try {
   console.log('==================================================');
   console.log('STATUS: ALL TESTS PASSED SUCCESSFULLY');
   console.log('==================================================');
+  // @ts-ignore
+  process.exit(0);
 } catch (error: any) {
   console.error(error.message);
+  // @ts-ignore
   process.exit(1);
 }

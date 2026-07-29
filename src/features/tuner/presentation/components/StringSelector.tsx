@@ -6,14 +6,21 @@ import { StringNote } from '../../domain/models/TunerModels';
 import { useTheme } from '../hooks/useTheme';
 import { HapticsService } from '@/core/haptics/services/HapticsService';
 import { Fonts } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export function StringSelector() {
   const theme = useTheme();
-  const { activeInstrument, activeTuning, selectedNote, setSelectedNote, currentPitch } = useTunerStore();
+  const { activeInstrument, activeTuning, selectedNote, setSelectedNote, currentPitch, lastValidNote } = useTunerStore();
   const { triggerPluck } = useTuner();
+  const { isCompact, isTablet } = useResponsive();
 
-  // The active note being tuned (either manually selected, or auto-detected)
-  const activeNote = selectedNote ?? currentPitch?.targetNote;
+  const pegSize = isCompact ? 40 : (isTablet ? 60 : 52);
+  const pegFontSize = isCompact ? 11 : (isTablet ? 16 : 14);
+  const octaveFontSize = isCompact ? 7 : (isTablet ? 11 : 9);
+  const pegBorderRadius = pegSize / 2;
+
+  // The active note being tuned (either manually selected, auto-detected, or the last valid note)
+  const activeNote = selectedNote ?? currentPitch?.targetNote ?? lastValidNote?.targetNote;
 
   const handleNotePress = (note: StringNote) => {
     setSelectedNote(note);
@@ -38,12 +45,15 @@ export function StringSelector() {
         </Text>
       </View>
 
-      <View style={styles.selectorRow}>
+      <View style={[styles.selectorRow, { gap: isCompact ? 6 : (isTablet ? 12 : 10) }]}>
         {/* Auto Detection Toggle Peg */}
         <TouchableOpacity
           style={[
             styles.pegButton,
             {
+              width: pegSize,
+              height: pegSize,
+              borderRadius: pegBorderRadius,
               backgroundColor: !selectedNote ? theme.accent : theme.card,
               borderColor: !selectedNote ? theme.accent : theme.border,
             },
@@ -57,6 +67,7 @@ export function StringSelector() {
               {
                 color: !selectedNote ? '#FFFFFF' : theme.textSecondary,
                 fontFamily: !selectedNote ? Fonts.bold : Fonts.semiBold,
+                fontSize: pegFontSize,
               },
             ]}
           >
@@ -93,6 +104,9 @@ export function StringSelector() {
               style={[
                 styles.pegButton,
                 {
+                  width: pegSize,
+                  height: pegSize,
+                  borderRadius: pegBorderRadius,
                   backgroundColor: buttonBg,
                   borderColor: buttonBorder,
                 },
@@ -106,6 +120,7 @@ export function StringSelector() {
                   {
                     color: textColor,
                     fontFamily: isSelected || isActive ? Fonts.bold : Fonts.semiBold,
+                    fontSize: pegFontSize,
                   },
                 ]}
               >
@@ -116,6 +131,7 @@ export function StringSelector() {
                   styles.octaveText,
                   {
                     color: octaveColor,
+                    fontSize: octaveFontSize,
                   },
                 ]}
               >

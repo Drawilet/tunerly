@@ -8,6 +8,7 @@ import { InstrumentBandpassFilter } from '@/core/pitch/services/SignalFilter';
 import { SignalValidator } from '@/core/pitch/services/SignalValidator';
 import { StringNote } from '../../domain/models/TunerModels';
 import { HapticsService } from '@/core/haptics/services/HapticsService';
+import { NoiseGate } from '@/core/audio/services/NoiseGate';
 
 /**
  * Calculates the Root Mean Square (RMS) amplitude of a PCM audio buffer.
@@ -42,8 +43,11 @@ export function useTuner() {
   // YIN Pitch detector (threshold 0.15)
   const detector = useRef(new YinDetector(0.15));
   
-  // Temporal pitch smoother (window size 5, alpha 0.20, auto-reset threshold 8%)
-  const pitchFilter = useRef(new PitchFilter(5, 0.20, 0.08));
+  // Temporal pitch smoother (window size 5, alpha 0.15, auto-reset threshold 5%)
+  const pitchFilter = useRef(new PitchFilter(5, 0.15, 0.05));
+
+  // Noise gate for filtering out low-amplitude room noise
+  const noiseGate = useRef(new NoiseGate(0.03));
 
   // Signal processing filters & validator
   const filter = useRef(new InstrumentBandpassFilter());
@@ -122,14 +126,18 @@ export function useTuner() {
     const currentThreshold = useTunerStore.getState().calibratedThreshold;
     const currentNoiseFloor = useTunerStore.getState().noiseFloor;
 
+    // Synchronize current threshold to noise gate
+    noiseGate.current.setThreshold(currentThreshold);
+
     // 4. Noise Gate: Reject if below threshold
-    if (filteredRms < currentThreshold) {
+    if (!noiseGate.current.isOpen(filteredRms)) {
       // If no valid signal, check if we exceed 300 ms silence timeout
       if (Date.now() - lastValidNoteTime.current > 300) {
         setCurrentPitch(null);
         lockedNoteRef.current = null;
         wasInTuneRef.current = false;
         validator.current.reset();
+        pitchFilter.current.reset();
       }
 
       setDebugData({
@@ -157,6 +165,7 @@ export function useTuner() {
         lockedNoteRef.current = null;
         wasInTuneRef.current = false;
         validator.current.reset();
+        pitchFilter.current.reset();
       }
 
       setDebugData({
@@ -178,6 +187,7 @@ export function useTuner() {
         setCurrentPitch(null);
         lockedNoteRef.current = null;
         wasInTuneRef.current = false;
+        pitchFilter.current.reset();
       }
 
       setDebugData({
@@ -256,6 +266,7 @@ export function useTuner() {
         lockedNoteRef.current = null;
         wasInTuneRef.current = false;
         validator.current.reset();
+        pitchFilter.current.reset();
       }
 
       setDebugData({

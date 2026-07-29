@@ -188,6 +188,7 @@ function runVerification() {
   console.log('==================================================');
 
   // Exit with error if any tests failed
+  // @ts-ignore
   process.exit(overallPassed ? 0 : 1);
 }
 

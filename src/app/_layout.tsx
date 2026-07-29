@@ -27,8 +27,8 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  // The application should never render until the fonts are fully loaded
-  if (!fontsLoaded) {
+  // The application should never render until the fonts are fully loaded or fail
+  if (!fontsLoaded && !fontError) {
     return null;
   }
 

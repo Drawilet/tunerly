@@ -27,18 +27,9 @@ export const Colors = {
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 export const Fonts = {
-  regular: Platform.select({
-    ios: 'System',
-    default: 'Inter-Regular',
-  }) as string,
-  semiBold: Platform.select({
-    ios: 'System',
-    default: 'Inter-SemiBold',
-  }) as string,
-  bold: Platform.select({
-    ios: 'System',
-    default: 'Inter-Bold',
-  }) as string,
+  regular: 'Inter-Regular',
+  semiBold: 'Inter-SemiBold',
+  bold: 'Inter-Bold',
   mono: Platform.select({
     ios: 'ui-monospace',
     default: 'monospace',
