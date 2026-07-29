@@ -64,28 +64,6 @@ function TunerScreen() {
     }
   };
 
-  // If permission is explicitly denied, show the permission request gate
-  if (microphonePermission === false) {
-    return (
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.background,
-            paddingTop: insets.top + spacing.md,
-            paddingBottom: insets.bottom + spacing.md,
-            paddingLeft: insets.left + spacing.md,
-            paddingRight: insets.right + spacing.md,
-            justifyContent: 'center',
-            alignItems: 'center',
-          },
-        ]}
-      >
-        <PermissionGate onRequestPermission={startTuning} />
-      </View>
-    );
-  }
-
   /**
    * Tuner wrapper height budget (web only):
    * Cap the tuner area so the illustration and gauge do not become
@@ -102,6 +80,24 @@ function TunerScreen() {
    * On regular/expanded screens spacers grow comfortably.
    */
   const spacerFlex = isCompactHeight ? 0.3 : 0.5;
+
+  /**
+   * The root container is ALWAYS mounted, regardless of permission state.
+   *
+   * This is critical for web layout stability: if we swap to a completely
+   * different component tree when permission is denied and then back again
+   * when it is granted, useWindowDimensions() and useSafeAreaInsets() are
+   * re-evaluated on a freshly-mounted DOM subtree. The browser may report
+   * slightly different viewport dimensions at that moment (e.g. because the
+   * previous tree altered scroll/overflow or the safe-area context had not
+   * yet settled), causing the zoomed/compressed layout regression.
+   *
+   * Solution: render the permission gate as an OVERLAY (StyleSheet.absoluteFill)
+   * on top of the already-mounted tuner tree. The tuner tree remains in the DOM
+   * throughout the permission flow, so its responsive measurements are always
+   * taken in the final, stable layout context.
+   */
+  const showPermissionGate = microphonePermission === false;
 
   return (
     <View
@@ -133,11 +129,6 @@ function TunerScreen() {
           [Tuner Display — flex: 1, grows into available space]
           [String Selector]
           [Bottom padding — safe area]
-
-        The tuner wrapper has flex: 1 so it absorbs all remaining vertical
-        space after the header, selectors, and string row have been laid out.
-        Spacers have a small flex value so they yield to the tuner area on
-        short screens but provide breathing room on tall screens.
       */}
       <View
         style={{
@@ -207,6 +198,24 @@ function TunerScreen() {
           <StringSelector />
         </View>
       </View>
+
+      {/*
+        Permission gate renders as a full-screen overlay on top of the already-
+        mounted tuner layout.  This preserves the root container and all its
+        responsive measurements across the permission state transition, so
+        useWindowDimensions() is never re-evaluated in a different DOM context.
+      */}
+      {showPermissionGate && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.permissionOverlay,
+            { backgroundColor: theme.background },
+          ]}
+        >
+          <PermissionGate onRequestPermission={startTuning} />
+        </View>
+      )}
 
       <DebugOverlay />
     </View>
@@ -288,5 +297,10 @@ const styles = StyleSheet.create({
   },
   selectorWrapper: {
     width: '100%',
+  },
+  permissionOverlay: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 });
