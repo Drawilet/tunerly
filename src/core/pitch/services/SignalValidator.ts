@@ -1,11 +1,33 @@
+export interface SignalValidatorConfig {
+  /** Number of frames tracked in the rolling frequency history for stability checks. */
+  stabilityHistorySize: number;
+  /** Maximum relative deviation (max - min) / min allowed across the history window. */
+  stabilityDeviationLimit: number;
+  /** Consecutive frames the same chromatic note must appear to be accepted as locked. */
+  debounceFrames: number;
+}
+
+const DEFAULT_CONFIG: SignalValidatorConfig = {
+  stabilityHistorySize:    6,
+  stabilityDeviationLimit: 0.02,
+  debounceFrames:          4,
+};
+
 export class SignalValidator {
   private history: number[] = [];
-  private maxHistory = 6;
-  private stabilityThreshold = 0.02; // 2% deviation threshold
+  private readonly maxHistory: number;
+  private readonly stabilityThreshold: number;
+  private readonly requiredStableFrames: number;
 
   private candidateNoteId: string | null = null;
   private candidateCount = 0;
-  private requiredStableFrames = 4; // Number of stable frames needed to switch/lock notes
+
+  constructor(config: Partial<SignalValidatorConfig> = {}) {
+    const cfg = { ...DEFAULT_CONFIG, ...config };
+    this.maxHistory = cfg.stabilityHistorySize;
+    this.stabilityThreshold = cfg.stabilityDeviationLimit;
+    this.requiredStableFrames = cfg.debounceFrames;
+  }
 
   /**
    * Checks if the detected frequency is within the absolute boundaries of the selected instrument.
@@ -25,7 +47,8 @@ export class SignalValidator {
   }
 
   /**
-   * Tracks a rolling history of frequencies and determines if they are stable within 2% deviation.
+   * Tracks a rolling history of frequencies and determines if they are stable
+   * within the configured deviation limit.
    */
   public validateStability(frequency: number): boolean {
     if (frequency <= 0) {
@@ -50,8 +73,8 @@ export class SignalValidator {
   }
 
   /**
-   * Ensures that note transitions are debounced and only locks a new note once it has remained
-   * stable for a minimum number of consecutive frames.
+   * Ensures that note transitions are debounced and only locks a new note once
+   * it has remained stable for the configured number of consecutive frames.
    */
   public debounceNoteChange(targetNoteId: string): boolean {
     if (this.candidateNoteId === targetNoteId) {
@@ -61,6 +84,30 @@ export class SignalValidator {
       this.candidateCount = 1;
     }
     return this.candidateCount >= this.requiredStableFrames;
+  }
+
+  /**
+   * Validates that a played frequency remains within an acceptable cents range
+   * of the currently locked note's frequency.
+   *
+   * Uses a cents-based tolerance instead of MIDI-integer equality to handle
+   * natural pitch wobble, microphone noise, and fine-grained frequency estimation
+   * without falsely breaking the note lock.
+   *
+   * @param playedFrequency   The current smoothed/detected frequency (Hz).
+   * @param lockedFrequency   The locked note's exact reference frequency (Hz).
+   * @param centsTolerance    Maximum deviation in cents to still consider "same note".
+   *                          100 cents = 1 semitone. Recommended: 75 cents.
+   * @returns true if the played frequency is within tolerance of the locked note.
+   */
+  public validateNoteLock(
+    playedFrequency: number,
+    lockedFrequency: number,
+    centsTolerance: number
+  ): boolean {
+    if (playedFrequency <= 0 || lockedFrequency <= 0) return false;
+    const cents = Math.abs(1200 * Math.log2(playedFrequency / lockedFrequency));
+    return cents <= centsTolerance;
   }
 
   /**

@@ -9,6 +9,14 @@ import { SignalValidator } from '@/core/pitch/services/SignalValidator';
 import { StringNote } from '../../domain/models/TunerModels';
 import { HapticsService } from '@/core/haptics/services/HapticsService';
 import { NoiseGate } from '@/core/audio/services/NoiseGate';
+import { getAudioEngineConfig } from '@/core/audio/services/AudioEngineConfig';
+
+/**
+ * Load the platform-specific audio engine configuration once at module init.
+ * All pipeline parameters are sourced from this object — no magic numbers
+ * are permitted in the hook body.
+ */
+const ENGINE_CONFIG = getAudioEngineConfig();
 
 /**
  * Calculates the Root Mean Square (RMS) amplitude of a PCM audio buffer.
@@ -39,19 +47,29 @@ export function useTuner() {
   } = useTunerStore();
 
   const recorder = useRef(AudioRecorderFactory.getRecorder());
-  
-  // YIN Pitch detector (threshold 0.15)
-  const detector = useRef(new YinDetector(0.15));
-  
-  // Temporal pitch smoother (window size 5, alpha 0.15, auto-reset threshold 5%)
-  const pitchFilter = useRef(new PitchFilter(5, 0.15, 0.05));
 
-  // Noise gate for filtering out low-amplitude room noise
-  const noiseGate = useRef(new NoiseGate(0.06));
+  // YIN Pitch detector — threshold and fallback from platform config
+  const detector = useRef(
+    new YinDetector(ENGINE_CONFIG.yinThreshold, 4096, ENGINE_CONFIG.yinFallbackThreshold)
+  );
 
-  // Signal processing filters & validator
+  // Temporal pitch smoother — median window, EMA alpha, and reset threshold from config
+  const pitchFilter = useRef(
+    new PitchFilter(ENGINE_CONFIG.medianWindowSize, ENGINE_CONFIG.emaAlpha, ENGINE_CONFIG.pitchResetThreshold)
+  );
+
+  // Noise gate — base threshold from config (refined further after calibration)
+  const noiseGate = useRef(new NoiseGate(ENGINE_CONFIG.noiseGateBaseThreshold));
+
+  // Signal processing filters & validator — all tuning values from config
   const filter = useRef(new InstrumentBandpassFilter());
-  const validator = useRef(new SignalValidator());
+  const validator = useRef(
+    new SignalValidator({
+      stabilityHistorySize:    ENGINE_CONFIG.stabilityHistorySize,
+      stabilityDeviationLimit: ENGINE_CONFIG.stabilityDeviationLimit,
+      debounceFrames:          ENGINE_CONFIG.debounceFrames,
+    })
+  );
 
   // Calibration state tracking
   const calibrationSamples = useRef<number[]>([]);
@@ -91,19 +109,23 @@ export function useTuner() {
     const filteredBuffer = filter.current.filter(buffer);
     const filteredRms = calculateRMS(filteredBuffer);
 
-    // 3. Noise Floor Calibration (First 500 ms)
+    // 2. Noise Floor Calibration (duration from config)
     if (isCalibratingRef.current) {
       const elapsed = Date.now() - calibrationStart.current;
       calibrationSamples.current.push(filteredRms);
 
-      if (elapsed >= 500) {
+      if (elapsed >= ENGINE_CONFIG.calibrationDurationMs) {
         // Finish calibration
         const sum = calibrationSamples.current.reduce((a, b) => a + b, 0);
         const avg = sum / Math.max(1, calibrationSamples.current.length);
         const noiseFloorVal = avg;
-        // Calibrated threshold: triple the noise floor, but at least 0.06
-        const thresholdVal = Math.max(0.06, noiseFloorVal * 3.0);
-        
+
+        // Calibrated threshold: configurable multiplier, configurable floor minimum
+        const thresholdVal = Math.max(
+          ENGINE_CONFIG.calibrationMinimum,
+          noiseFloorVal * ENGINE_CONFIG.calibrationMultiplier
+        );
+
         setNoiseFloor(noiseFloorVal, thresholdVal);
         setIsCalibrating(false);
         isCalibratingRef.current = false;
@@ -116,7 +138,7 @@ export function useTuner() {
         confidence: 0,
         stableFrames: 0,
         noiseFloor: 0,
-        currentThreshold: 0.06,
+        currentThreshold: ENGINE_CONFIG.noiseGateBaseThreshold,
         state: 'calibrating',
       });
       return;
@@ -129,10 +151,10 @@ export function useTuner() {
     // Synchronize current threshold to noise gate
     noiseGate.current.setThreshold(currentThreshold);
 
-    // 4. Noise Gate: Reject if below threshold
+    // 3. Noise Gate: Reject if below threshold
     if (!noiseGate.current.isOpen(filteredRms)) {
-      // If no valid signal, check if we exceed 300 ms silence timeout
-      if (Date.now() - lastValidNoteTime.current > 300) {
+      // If no valid signal, check if we exceed the configured silence timeout
+      if (Date.now() - lastValidNoteTime.current > ENGINE_CONFIG.silenceTimeoutMs) {
         setCurrentPitch(null);
         lockedNoteRef.current = null;
         wasInTuneRef.current = false;
@@ -152,15 +174,15 @@ export function useTuner() {
       return;
     }
 
-    // 5. Detect Pitch using YIN
+    // 4. Detect Pitch using YIN
     const yinResult = detector.current.detect(filteredBuffer, recorder.current.sampleRate);
 
-    // 6. Check Confidence & Frequency bounds
+    // 5. Check Confidence & Frequency bounds (confidence threshold from config)
     const inBounds = validator.current.isFrequencyInBounds(yinResult.frequency, activeInstrumentRef.current.id);
-    const hasConfidence = yinResult.confidence >= 0.40; // 0.40 minimum confidence threshold
+    const hasConfidence = yinResult.confidence >= ENGINE_CONFIG.confidenceThreshold;
 
     if (!inBounds || !hasConfidence) {
-      if (Date.now() - lastValidNoteTime.current > 300) {
+      if (Date.now() - lastValidNoteTime.current > ENGINE_CONFIG.silenceTimeoutMs) {
         setCurrentPitch(null);
         lockedNoteRef.current = null;
         wasInTuneRef.current = false;
@@ -180,10 +202,10 @@ export function useTuner() {
       return;
     }
 
-    // 7. Stability Check (consecutive frames within 2% deviation)
+    // 6. Stability Check (consecutive frames within configured deviation limit)
     const isStable = validator.current.validateStability(yinResult.frequency);
     if (!isStable) {
-      if (Date.now() - lastValidNoteTime.current > 300) {
+      if (Date.now() - lastValidNoteTime.current > ENGINE_CONFIG.silenceTimeoutMs) {
         setCurrentPitch(null);
         lockedNoteRef.current = null;
         wasInTuneRef.current = false;
@@ -202,23 +224,22 @@ export function useTuner() {
       return;
     }
 
-    // 8. Smoothed Frequency Calculation
+    // 7. Smoothed Frequency Calculation
     const smoothedFreq = pitchFilter.current.filter(yinResult.frequency);
 
-    // 9. Match with closest chromatic note for debouncing
+    // 8. Match with closest chromatic note for debouncing
     const playedMidi = PitchProcessor.frequencyToMidi(smoothedFreq, calibrationA4Ref.current);
     const closestMidi = Math.round(playedMidi);
     const midiId = `midi-${closestMidi}`;
 
-    // Debounce note changes (require 4 stable consecutive frames of the target chromatic note)
+    // Debounce note changes (require configured consecutive stable frames)
     const isDebounced = validator.current.debounceNoteChange(midiId);
-    
+
     if (selectedNoteRef.current) {
       // Manual Mode: locked to the selected note
       lockedNoteRef.current = selectedNoteRef.current;
     } else if (isDebounced || !lockedNoteRef.current) {
-      // Auto Mode: automatically detect the closest string from the tuning list
-      // BUT for chromatic behavior, the actual cents calculation is done relative to the closest chromatic note!
+      // Auto Mode: resolve the locked note from the active tuning list
       const matchedTuningNote = activeTuningRef.current.notes.find((note) => {
         const noteMidi = PitchProcessor.frequencyToMidi(note.frequency, calibrationA4Ref.current);
         return Math.round(noteMidi) === closestMidi;
@@ -237,17 +258,23 @@ export function useTuner() {
       }
     }
 
-    // 10. Lock verification: only accept pitches that match our locked chromatic note
-    const lockedMidi = Math.round(PitchProcessor.frequencyToMidi(lockedNoteRef.current.frequency, calibrationA4Ref.current));
+    // 9. Note Lock verification (cents-based tolerance instead of exact MIDI integer equality)
+    //    This prevents natural pitch wobble and minor mic noise from breaking the lock when
+    //    the played frequency rounds to an adjacent semitone.
+    const lockHolds = validator.current.validateNoteLock(
+      smoothedFreq,
+      lockedNoteRef.current.frequency,
+      ENGINE_CONFIG.noteLockCentsTolerance
+    );
 
-    if (closestMidi === lockedMidi) {
+    if (lockHolds) {
       const pitchResult = PitchProcessor.process(
         smoothedFreq,
         yinResult.confidence,
         activeTuningRef.current.notes,
         selectedNoteRef.current ?? lockedNoteRef.current,
         calibrationA4Ref.current,
-        0.40
+        ENGINE_CONFIG.confidenceThreshold
       );
 
       if (pitchResult) {
@@ -275,8 +302,8 @@ export function useTuner() {
         state: 'accepted',
       });
     } else {
-      // Out of band jump
-      if (Date.now() - lastValidNoteTime.current > 300) {
+      // Frequency jumped outside the lock tolerance — treat as note change
+      if (Date.now() - lastValidNoteTime.current > ENGINE_CONFIG.silenceTimeoutMs) {
         setCurrentPitch(null);
         lockedNoteRef.current = null;
         wasInTuneRef.current = false;
@@ -302,13 +329,13 @@ export function useTuner() {
       setPermission(hasPermission);
 
       if (hasPermission) {
-        // Trigger 500ms calibration
+        // Trigger calibration (duration from config)
         setIsCalibrating(true);
         isCalibratingRef.current = true;
         calibrationSamples.current = [];
         calibrationStart.current = Date.now();
         lastValidNoteTime.current = Date.now();
-        
+
         filter.current.reset();
         validator.current.reset();
 

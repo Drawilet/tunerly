@@ -5,10 +5,19 @@ export interface YinResult {
 
 export class YinDetector {
   private threshold: number;
+  private fallbackThreshold: number;
   private yinBuffer: Float32Array;
 
-  constructor(threshold = 0.15, maxBufferSize = 4096) {
+  /**
+   * @param threshold        YIN absolute threshold (lower = stricter periodicity requirement).
+   * @param maxBufferSize    Maximum PCM buffer size to allocate for internal working memory.
+   * @param fallbackThreshold If no clear local minimum is found below `threshold`, accept the
+   *                         global minimum only if its value is below this fallback. Tighten on
+   *                         mobile to reject ambiguous low-SNR frames (e.g. 0.30 vs 0.40).
+   */
+  constructor(threshold = 0.15, maxBufferSize = 4096, fallbackThreshold = 0.40) {
     this.threshold = threshold;
+    this.fallbackThreshold = fallbackThreshold;
     this.yinBuffer = new Float32Array(maxBufferSize);
   }
 
@@ -117,8 +126,8 @@ export class YinDetector {
       }
     }
 
-    // Fallback to global minimum if it is reasonably periodic (e.g., normalized difference < 0.4)
-    if (globalMinTau !== -1 && globalMinVal < 0.4) {
+    // Fallback to global minimum if it is reasonably periodic
+    if (globalMinTau !== -1 && globalMinVal < this.fallbackThreshold) {
       return globalMinTau;
     }
 
