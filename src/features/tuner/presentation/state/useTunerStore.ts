@@ -38,6 +38,10 @@ interface TunerState {
   showDebug: boolean;
   debugData: DebugData;
 
+  // Theme Mode Settings
+  themeMode: 'system' | 'light' | 'dark';
+  setThemeMode: (mode: 'system' | 'light' | 'dark') => void;
+
   setInstrument: (instrument: Instrument) => void;
   setTuning: (tuning: Tuning) => void;
   setSelectedNote: (note: StringNote | null) => void;
@@ -62,11 +66,14 @@ export const useTunerStore = create<TunerState>((set) => ({
   isRecording: false,
   microphonePermission: null,
   calibrationA4: 440,
-  amplitudeThreshold: 0.03, // Base fallback threshold (RMS)
+  amplitudeThreshold: 0.06, // Base fallback threshold (RMS)
   
   isCalibrating: false,
   noiseFloor: 0.0,
-  calibratedThreshold: 0.03,
+  calibratedThreshold: 0.06,
+
+  themeMode: 'system',
+  setThemeMode: (themeMode) => set({ themeMode }),
 
   showDebug: false,
   debugData: {
@@ -75,7 +82,7 @@ export const useTunerStore = create<TunerState>((set) => ({
     confidence: 0,
     stableFrames: 0,
     noiseFloor: 0,
-    currentThreshold: 0.03,
+    currentThreshold: 0.06,
     state: 'silence',
   },
 
@@ -130,6 +137,7 @@ export const useTunerStore = create<TunerState>((set) => ({
       isRecording: false,
       isCalibrating: false,
       noiseFloor: 0,
-      calibratedThreshold: 0.03,
+      calibratedThreshold: 0.06,
+      themeMode: 'system',
     }),
 }));

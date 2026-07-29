@@ -1,9 +1,26 @@
-import { useColorScheme } from 'react-native';
+import { useColorScheme, Platform } from 'react-native';
 import { Colors } from '@/constants/theme';
+import { useTunerStore } from '../state/useTunerStore';
+import { useEffect } from 'react';
 
 export function useTheme() {
-  const scheme = useColorScheme() === 'light' ? 'light' : 'dark';
+  const systemScheme = useColorScheme();
+  const themeMode = useTunerStore((s) => s.themeMode);
+  
+  const scheme = themeMode === 'system'
+    ? (systemScheme === 'light' ? 'light' : 'dark')
+    : themeMode;
+    
   const themeColors = Colors[scheme];
+
+  // Dynamically synchronize the body background and text color on Web
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.body.style.backgroundColor = themeColors.background;
+      document.body.style.color = themeColors.textPrimary;
+      document.body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+    }
+  }, [scheme, themeColors]);
 
   return {
     background: themeColors.background,
@@ -19,5 +36,6 @@ export function useTheme() {
     tunerCircle: themeColors.surface,
     tunerInnerCircle: themeColors.background,
     isDark: scheme === 'dark',
+    themeMode,
   };
 }

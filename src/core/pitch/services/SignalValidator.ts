@@ -13,14 +13,14 @@ export class SignalValidator {
   public isFrequencyInBounds(frequency: number, instrumentId: string): boolean {
     switch (instrumentId) {
       case 'bass':
-        return frequency >= 25 && frequency <= 350;
+        return frequency >= 20 && frequency <= 450;
       case 'ukulele':
-        return frequency >= 180 && frequency <= 1000;
+        return frequency >= 150 && frequency <= 1200;
       case 'violin':
-        return frequency >= 170 && frequency <= 1300;
+        return frequency >= 150 && frequency <= 1500;
       case 'guitar':
       default:
-        return frequency >= 60 && frequency <= 1400;
+        return frequency >= 50 && frequency <= 1500;
     }
   }
 

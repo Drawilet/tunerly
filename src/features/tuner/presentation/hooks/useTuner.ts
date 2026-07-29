@@ -47,7 +47,7 @@ export function useTuner() {
   const pitchFilter = useRef(new PitchFilter(5, 0.15, 0.05));
 
   // Noise gate for filtering out low-amplitude room noise
-  const noiseGate = useRef(new NoiseGate(0.03));
+  const noiseGate = useRef(new NoiseGate(0.06));
 
   // Signal processing filters & validator
   const filter = useRef(new InstrumentBandpassFilter());
@@ -101,8 +101,8 @@ export function useTuner() {
         const sum = calibrationSamples.current.reduce((a, b) => a + b, 0);
         const avg = sum / Math.max(1, calibrationSamples.current.length);
         const noiseFloorVal = avg;
-        // Calibrated threshold: double the noise floor, but at least 0.02
-        const thresholdVal = Math.max(0.02, noiseFloorVal * 2.0);
+        // Calibrated threshold: triple the noise floor, but at least 0.06
+        const thresholdVal = Math.max(0.06, noiseFloorVal * 3.0);
         
         setNoiseFloor(noiseFloorVal, thresholdVal);
         setIsCalibrating(false);
@@ -116,7 +116,7 @@ export function useTuner() {
         confidence: 0,
         stableFrames: 0,
         noiseFloor: 0,
-        currentThreshold: 0.03,
+        currentThreshold: 0.06,
         state: 'calibrating',
       });
       return;
@@ -205,32 +205,47 @@ export function useTuner() {
     // 8. Smoothed Frequency Calculation
     const smoothedFreq = pitchFilter.current.filter(yinResult.frequency);
 
-    // 9. Match with closest target note
-    let closestNote = activeTuningRef.current.notes[0];
-    let minDiff = Infinity;
-    for (const note of activeTuningRef.current.notes) {
-      const diff = Math.abs(smoothedFreq - note.frequency);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closestNote = note;
+    // 9. Match with closest chromatic note for debouncing
+    const playedMidi = PitchProcessor.frequencyToMidi(smoothedFreq, calibrationA4Ref.current);
+    const closestMidi = Math.round(playedMidi);
+    const midiId = `midi-${closestMidi}`;
+
+    // Debounce note changes (require 4 stable consecutive frames of the target chromatic note)
+    const isDebounced = validator.current.debounceNoteChange(midiId);
+    
+    if (selectedNoteRef.current) {
+      // Manual Mode: locked to the selected note
+      lockedNoteRef.current = selectedNoteRef.current;
+    } else if (isDebounced || !lockedNoteRef.current) {
+      // Auto Mode: automatically detect the closest string from the tuning list
+      // BUT for chromatic behavior, the actual cents calculation is done relative to the closest chromatic note!
+      const matchedTuningNote = activeTuningRef.current.notes.find((note) => {
+        const noteMidi = PitchProcessor.frequencyToMidi(note.frequency, calibrationA4Ref.current);
+        return Math.round(noteMidi) === closestMidi;
+      });
+
+      if (matchedTuningNote) {
+        lockedNoteRef.current = matchedTuningNote;
+      } else {
+        const { noteName, octave } = PitchProcessor.midiToNoteDetails(closestMidi);
+        lockedNoteRef.current = {
+          id: midiId,
+          name: noteName,
+          octave: octave,
+          frequency: PitchProcessor.midiToFrequency(closestMidi, calibrationA4Ref.current),
+        };
       }
     }
 
-    // 10. Debounce note changes (require 4 stable consecutive frames of the target note)
-    const isDebounced = validator.current.debounceNoteChange(closestNote.id);
-    if (selectedNoteRef.current) {
-      lockedNoteRef.current = selectedNoteRef.current;
-    } else if (isDebounced || !lockedNoteRef.current) {
-      lockedNoteRef.current = closestNote;
-    }
+    // 10. Lock verification: only accept pitches that match our locked chromatic note
+    const lockedMidi = Math.round(PitchProcessor.frequencyToMidi(lockedNoteRef.current.frequency, calibrationA4Ref.current));
 
-    // 11. Lock validation to prevent target note jumping during decay
-    if (closestNote.id === lockedNoteRef.current.id) {
+    if (closestMidi === lockedMidi) {
       const pitchResult = PitchProcessor.process(
         smoothedFreq,
         yinResult.confidence,
         activeTuningRef.current.notes,
-        lockedNoteRef.current,
+        selectedNoteRef.current ?? lockedNoteRef.current,
         calibrationA4Ref.current,
         0.40
       );

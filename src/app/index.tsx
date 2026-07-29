@@ -22,7 +22,7 @@ function TunerScreen() {
   const microphonePermission = useTunerStore((s) => s.microphonePermission);
   const showDebug = useTunerStore((s) => s.showDebug);
   const setShowDebug = useTunerStore((s) => s.setShowDebug);
-  const { insets, isTablet, contentMaxWidth, spacing } = useResponsive();
+  const { insets, isTablet, isDesktop, contentMaxWidth, spacing } = useResponsive();
 
   // Auto-start listening on screen mount
   useEffect(() => {
@@ -31,6 +31,29 @@ function TunerScreen() {
       stopTuning();
     };
   }, [startTuning, stopTuning]);
+
+  const themeMode = useTunerStore((s) => s.themeMode);
+  const setThemeMode = useTunerStore((s) => s.setThemeMode);
+
+  const toggleTheme = () => {
+    if (themeMode === 'system') {
+      setThemeMode('light');
+    } else if (themeMode === 'light') {
+      setThemeMode('dark');
+    } else {
+      setThemeMode('system');
+    }
+  };
+
+  const getThemeText = () => {
+    switch (themeMode) {
+      case 'light': return 'LIGHT';
+      case 'dark': return 'DARK';
+      case 'system':
+      default:
+        return 'AUTO';
+    }
+  };
 
   // If permission is explicitly denied, show the permission request gate
   if (microphonePermission === false) {
@@ -78,13 +101,26 @@ function TunerScreen() {
         style={{
           flex: 1,
           width: '100%',
-          maxWidth: isTablet ? contentMaxWidth : '100%',
+          maxWidth: (isTablet || isDesktop) ? contentMaxWidth : '100%',
           justifyContent: 'space-between',
           alignItems: 'center',
         }}
       >
         {/* Brand Header */}
         <View style={styles.header}>
+          <TouchableOpacity
+            style={[styles.themeToggle, { borderColor: theme.border, backgroundColor: theme.card }]}
+            onPress={toggleTheme}
+            activeOpacity={0.7}
+          >
+            <ThemedText
+              themeColor={themeMode !== 'system' ? 'primary' : 'textTertiary'}
+              style={styles.themeToggleText}
+            >
+              {getThemeText()}
+            </ThemedText>
+          </TouchableOpacity>
+
           <ThemedText style={styles.brandTitle}>TUNERLY</ThemedText>
           <ThemedText themeColor="textTertiary" style={styles.brandSubtitle}>chromatic tuner</ThemedText>
           
@@ -158,6 +194,20 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   debugToggleText: {
+    fontSize: 9,
+    letterSpacing: 0.5,
+    fontFamily: Fonts.semiBold,
+  },
+  themeToggle: {
+    position: 'absolute',
+    left: 20,
+    top: 6,
+    borderWidth: 0.5,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  themeToggleText: {
     fontSize: 9,
     letterSpacing: 0.5,
     fontFamily: Fonts.semiBold,

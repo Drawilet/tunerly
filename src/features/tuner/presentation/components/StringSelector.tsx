@@ -12,11 +12,11 @@ export function StringSelector() {
   const theme = useTheme();
   const { activeInstrument, activeTuning, selectedNote, setSelectedNote, currentPitch, lastValidNote } = useTunerStore();
   const { triggerPluck } = useTuner();
-  const { isCompact, isTablet } = useResponsive();
+  const { isCompact, isTablet, isDesktop } = useResponsive();
 
-  const pegSize = isCompact ? 40 : (isTablet ? 60 : 52);
-  const pegFontSize = isCompact ? 11 : (isTablet ? 16 : 14);
-  const octaveFontSize = isCompact ? 7 : (isTablet ? 11 : 9);
+  const pegSize = isCompact ? 40 : (isDesktop ? 72 : (isTablet ? 60 : 52));
+  const pegFontSize = isCompact ? 11 : (isDesktop ? 18 : (isTablet ? 16 : 14));
+  const octaveFontSize = isCompact ? 7 : (isDesktop ? 12 : (isTablet ? 11 : 9));
   const pegBorderRadius = pegSize / 2;
 
   // The active note being tuned (either manually selected, auto-detected, or the last valid note)
@@ -40,12 +40,12 @@ export function StringSelector() {
     <View style={styles.container}>
       {/* Active Tuning Detail Label */}
       <View style={styles.header}>
-        <Text style={[styles.tuningLabel, { color: theme.textSecondary }]}>
+        <Text style={[styles.tuningLabel, { color: theme.textSecondary, fontSize: isCompact ? 10 : (isDesktop ? 18 : (isTablet ? 15 : 12)) }]}>
           {activeInstrument.name} • {activeTuning.name} ({tuningNotesList})
         </Text>
       </View>
 
-      <View style={[styles.selectorRow, { gap: isCompact ? 6 : (isTablet ? 12 : 10) }]}>
+      <View style={[styles.selectorRow, { gap: isCompact ? 6 : (isDesktop ? 18 : (isTablet ? 12 : 10)) }]}>
         {/* Auto Detection Toggle Peg */}
         <TouchableOpacity
           style={[

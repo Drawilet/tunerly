@@ -25,16 +25,16 @@ export function TunerDisplay() {
   const isCalibrating = useTunerStore((s) => s.isCalibrating);
   const lastValidNote = useTunerStore((s) => s.lastValidNote);
 
-  const { isCompact, isTablet, spacing, width } = useResponsive();
-  const SCALE_WIDTH = Math.min(width - spacing.md * 2, isTablet ? 400 : 330);
+  const { isCompact, isTablet, isDesktop, spacing, width } = useResponsive();
+  const SCALE_WIDTH = Math.min(width - spacing.md * 2, isDesktop ? 550 : (isTablet ? 420 : 330));
 
-  const ringSize = isCompact ? 120 : (isTablet ? 185 : 160);
-  const ringWrapperHeight = isCompact ? 130 : (isTablet ? 200 : 180);
-  const noteFontSize = isCompact ? 40 : (isTablet ? 64 : 56);
-  const octaveFontSize = isCompact ? 14 : (isTablet ? 22 : 18);
-  const illustrationHeight = isCompact ? 100 : (isTablet ? 200 : 160);
-  const dotSize = isCompact ? 8 : 10;
-  const borderWidth = 1.5;
+  const ringSize = isCompact ? 120 : (isDesktop ? 220 : (isTablet ? 185 : 160));
+  const ringWrapperHeight = isCompact ? 130 : (isDesktop ? 240 : (isTablet ? 200 : 180));
+  const noteFontSize = isCompact ? 40 : (isDesktop ? 80 : (isTablet ? 64 : 56));
+  const octaveFontSize = isCompact ? 14 : (isDesktop ? 26 : (isTablet ? 22 : 18));
+  const illustrationHeight = isCompact ? 100 : (isDesktop ? 240 : (isTablet ? 200 : 160));
+  const dotSize = isCompact ? 8 : (isDesktop ? 14 : 10);
+  const borderWidth = isDesktop ? 2.5 : 1.5;
 
   const centsShared = useSharedValue(0);
   const inTuneOpacity = useSharedValue(0);
@@ -161,7 +161,7 @@ export function TunerDisplay() {
               left: leftPosition,
               backgroundColor: isCenter
                 ? (currentPitch?.isInTune ? theme.success : theme.accent)
-                : (theme.isDark ? '#3A3A3C' : '#D1D1D6'),
+                : theme.border,
             },
             isCenter && styles.centerTick,
             isMajor && !isCenter && styles.majorTick,
@@ -211,7 +211,7 @@ export function TunerDisplay() {
 
           {/* Inner Content */}
           <View style={styles.noteContent}>
-            <Text style={[styles.instrumentLabel, { color: theme.textTertiary }]}>
+            <Text style={[styles.instrumentLabel, { color: theme.textTertiary, fontSize: isCompact ? 8 : (isDesktop ? 13 : (isTablet ? 11 : 9)) }]}>
               {activeInstrument.name.toUpperCase()}
             </Text>
             
@@ -222,7 +222,7 @@ export function TunerDisplay() {
                   {
                     color: currentPitch?.isInTune ? theme.success : theme.text,
                     fontSize: noteFontSize,
-                    lineHeight: noteFontSize + 8,
+                    lineHeight: noteFontSize + (isDesktop ? 12 : 8),
                   },
                 ]}
               >
@@ -243,7 +243,7 @@ export function TunerDisplay() {
               )}
             </View>
 
-            <Text style={[styles.frequencyText, { color: theme.textSecondary }]}>
+            <Text style={[styles.frequencyText, { color: theme.textSecondary, fontSize: isCompact ? 10 : (isDesktop ? 16 : 12) }]}>
               {frequencyText}
             </Text>
           </View>
@@ -252,7 +252,7 @@ export function TunerDisplay() {
 
       {/* Middle Area: Dynamic Vector Instrument Headstock */}
       <View style={[styles.illustrationContainer, { height: illustrationHeight }]}>
-        <View style={{ transform: [{ scale: isCompact ? 0.65 : (isTablet ? 1.15 : 1.0) }] }}>
+        <View style={{ transform: [{ scale: isCompact ? 0.65 : (isDesktop ? 1.4 : (isTablet ? 1.15 : 1.0)) }] }}>
           <InstrumentIllustration instrumentId={activeInstrument.id} />
         </View>
       </View>
@@ -283,6 +283,7 @@ export function TunerDisplay() {
                   ? theme.warning
                   : (currentPitch?.isInTune ? theme.success : theme.textSecondary),
                 fontFamily: isCalibrating || currentPitch?.isInTune ? Fonts.semiBold : Fonts.regular,
+                fontSize: isCompact ? 11 : (isDesktop ? 18 : (isTablet ? 15 : 13)),
               },
             ]}
           >
@@ -299,23 +300,35 @@ export function TunerDisplay() {
 
           {/* Labels (-50, 0, +50) */}
           <View style={styles.labelsWrapper}>
-            <Text style={[styles.scaleLabel, { color: theme.textTertiary }]}>♭</Text>
+            <Text style={[styles.scaleLabel, { color: theme.textTertiary, fontSize: isCompact ? 9 : (isDesktop ? 15 : (isTablet ? 13 : 11)) }]}>♭</Text>
             <Text
               style={[
                 styles.scaleLabel,
                 {
                   color: currentPitch?.isInTune ? theme.success : theme.textTertiary,
                   fontFamily: currentPitch?.isInTune ? Fonts.semiBold : Fonts.regular,
+                  fontSize: isCompact ? 9 : (isDesktop ? 15 : (isTablet ? 13 : 11)),
                 },
               ]}
             >
               0
             </Text>
-            <Text style={[styles.scaleLabel, { color: theme.textTertiary }]}>♯</Text>
+            <Text style={[styles.scaleLabel, { color: theme.textTertiary, fontSize: isCompact ? 9 : (isDesktop ? 15 : (isTablet ? 13 : 11)) }]}>♯</Text>
           </View>
 
           {/* The Animated Sweeping Needle */}
-          <Animated.View style={[styles.needle, needleAnimatedStyle]} />
+          <Animated.View
+            style={[
+              styles.needle,
+              needleAnimatedStyle,
+              {
+                width: isDesktop ? 2.5 : 1.5,
+                height: isDesktop ? 44 : 32,
+                top: isDesktop ? -18 : -12,
+                marginLeft: isDesktop ? -1.25 : -0.75,
+              },
+            ]}
+          />
         </View>
       </View>
     </View>

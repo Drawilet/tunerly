@@ -15,10 +15,12 @@ import { useResponsive } from '@/hooks/useResponsive';
 export function InstrumentSelector() {
   const theme = useTheme();
   const { activeInstrument, setInstrument } = useTunerStore();
-  const { width: windowWidth, spacing } = useResponsive();
+  const { width: windowWidth, spacing, isCompact, isTablet, isDesktop } = useResponsive();
 
   // Define total control width based on screen width
-  const containerWidth = Math.min(windowWidth - spacing.md * 2, 360);
+  const containerWidth = Math.min(windowWidth - spacing.md * 2, isDesktop ? 600 : (isTablet ? 450 : 360));
+  const containerHeight = isDesktop ? 76 : (isTablet ? 70 : 64);
+  const tabLabelFontSize = isCompact ? 10 : (isDesktop ? 14 : (isTablet ? 12 : 11));
   const tabWidth = (containerWidth - 6) / 4; // 4 items, 3px padding on each side
 
   // Find active index
@@ -46,48 +48,57 @@ export function InstrumentSelector() {
   // Render a minimal geometric representation icon for each instrument type
   const renderInstrumentIcon = (id: string, isSelected: boolean) => {
     const iconColor = isSelected ? theme.accent : theme.textTertiary;
+    const iconScale = isDesktop ? 1.35 : (isTablet ? 1.15 : 1.0);
 
-    switch (id) {
-      case 'guitar':
-        return (
-          <View style={styles.iconContainer}>
-            {/* Guitar Neck */}
-            <View style={[styles.miniNeck, { backgroundColor: iconColor, height: 12, top: 4 }]} />
-            {/* Guitar Body */}
-            <View style={[styles.miniBody, { backgroundColor: iconColor, width: 10, height: 12, borderRadius: 3, top: 14 }]} />
-          </View>
-        );
-      case 'bass':
-        return (
-          <View style={styles.iconContainer}>
-            {/* Bass Neck (longer) */}
-            <View style={[styles.miniNeck, { backgroundColor: iconColor, height: 16, top: 2 }]} />
-            {/* Bass Body */}
-            <View style={[styles.miniBody, { backgroundColor: iconColor, width: 11, height: 11, borderRadius: 2, top: 15 }]} />
-          </View>
-        );
-      case 'ukulele':
-        return (
-          <View style={styles.iconContainer}>
-            {/* Ukulele Neck */}
-            <View style={[styles.miniNeck, { backgroundColor: iconColor, height: 8, top: 6 }]} />
-            {/* Ukulele Body */}
-            <View style={[styles.miniBody, { backgroundColor: iconColor, width: 8, height: 10, borderRadius: 4, top: 12 }]} />
-          </View>
-        );
-      case 'violin':
-        return (
-          <View style={styles.iconContainer}>
-            {/* Violin Scroll/Peg box */}
-            <View style={[styles.miniNeck, { backgroundColor: iconColor, height: 10, top: 4 }]} />
-            {/* Hourglass shape body using two connected shapes */}
-            <View style={[styles.miniBody, { backgroundColor: iconColor, width: 9, height: 11, borderRadius: 4, top: 12 }]} />
-            <View style={[styles.miniBody, { backgroundColor: iconColor, width: 7, height: 6, borderRadius: 3, top: 9 }]} />
-          </View>
-        );
-      default:
-        return null;
-    }
+    const getIcon = () => {
+      switch (id) {
+        case 'guitar':
+          return (
+            <View style={styles.iconContainer}>
+              {/* Guitar Neck */}
+              <View style={[styles.miniNeck, { backgroundColor: iconColor, height: 12, top: 4 }]} />
+              {/* Guitar Body */}
+              <View style={[styles.miniBody, { backgroundColor: iconColor, width: 10, height: 12, borderRadius: 3, top: 14 }]} />
+            </View>
+          );
+        case 'bass':
+          return (
+            <View style={styles.iconContainer}>
+              {/* Bass Neck (longer) */}
+              <View style={[styles.miniNeck, { backgroundColor: iconColor, height: 16, top: 2 }]} />
+              {/* Bass Body */}
+              <View style={[styles.miniBody, { backgroundColor: iconColor, width: 11, height: 11, borderRadius: 2, top: 15 }]} />
+            </View>
+          );
+        case 'ukulele':
+          return (
+            <View style={styles.iconContainer}>
+              {/* Ukulele Neck */}
+              <View style={[styles.miniNeck, { backgroundColor: iconColor, height: 8, top: 6 }]} />
+              {/* Ukulele Body */}
+              <View style={[styles.miniBody, { backgroundColor: iconColor, width: 8, height: 10, borderRadius: 4, top: 12 }]} />
+            </View>
+          );
+        case 'violin':
+          return (
+            <View style={styles.iconContainer}>
+              {/* Violin Scroll/Peg box */}
+              <View style={[styles.miniNeck, { backgroundColor: iconColor, height: 10, top: 4 }]} />
+              {/* Hourglass shape body using two connected shapes */}
+              <View style={[styles.miniBody, { backgroundColor: iconColor, width: 9, height: 11, borderRadius: 4, top: 12 }]} />
+              <View style={[styles.miniBody, { backgroundColor: iconColor, width: 7, height: 6, borderRadius: 3, top: 9 }]} />
+            </View>
+          );
+        default:
+          return null;
+      }
+    };
+
+    return (
+      <View style={{ transform: [{ scale: iconScale }] }}>
+        {getIcon()}
+      </View>
+    );
   };
 
   return (
@@ -96,6 +107,7 @@ export function InstrumentSelector() {
         styles.container,
         {
           width: containerWidth,
+          height: containerHeight,
           backgroundColor: theme.isDark ? '#1C1C1E' : '#E5E5EA',
           borderColor: theme.border,
         },
@@ -130,6 +142,7 @@ export function InstrumentSelector() {
                 {
                   color: isSelected ? theme.accent : theme.textTertiary,
                   fontFamily: isSelected ? Fonts.semiBold : Fonts.regular,
+                  fontSize: tabLabelFontSize,
                 },
               ]}
             >

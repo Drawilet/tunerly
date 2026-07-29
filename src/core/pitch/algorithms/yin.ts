@@ -7,7 +7,7 @@ export class YinDetector {
   private threshold: number;
   private yinBuffer: Float32Array;
 
-  constructor(threshold = 0.15, maxBufferSize = 2048) {
+  constructor(threshold = 0.15, maxBufferSize = 4096) {
     this.threshold = threshold;
     this.yinBuffer = new Float32Array(maxBufferSize);
   }
@@ -21,9 +21,9 @@ export class YinDetector {
   detect(buffer: Float32Array, sampleRate: number): YinResult {
     const bufferSize = buffer.length;
     
-    // Bounds for instrument frequencies (30Hz to 1200Hz)
-    const minFreq = 30;
-    const maxFreq = 1200;
+    // Bounds for instrument frequencies (25Hz to 1600Hz)
+    const minFreq = 25;
+    const maxFreq = 1600;
     const minPeriod = Math.floor(sampleRate / maxFreq);
     const maxPeriod = Math.ceil(sampleRate / minFreq);
 

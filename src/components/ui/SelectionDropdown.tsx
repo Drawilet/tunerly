@@ -32,8 +32,12 @@ export function SelectionDropdown<T>({
   title = 'Select Option',
 }: SelectionDropdownProps<T>) {
   const theme = useTheme();
-  const { isTablet, insets } = useResponsive();
+  const { isTablet, isDesktop, insets } = useResponsive();
   const [modalVisible, setModalVisible] = useState(false);
+
+  const triggerHeight = isDesktop ? 50 : 40;
+  const triggerTextSize = isDesktop ? 16 : 13;
+  const triggerMinWidth = isDesktop ? 200 : 140;
 
   const selectedOption = options.find((opt) => opt.id === selectedOptionId);
 
@@ -74,6 +78,8 @@ export function SelectionDropdown<T>({
     );
   };
 
+  const isCenteredLayout = isTablet || isDesktop;
+
   return (
     <View style={styles.container}>
       {/* Trigger Button */}
@@ -83,12 +89,15 @@ export function SelectionDropdown<T>({
           {
             backgroundColor: theme.card,
             borderColor: theme.border,
+            height: triggerHeight,
+            borderRadius: triggerHeight / 2,
+            minWidth: triggerMinWidth,
           },
         ]}
         onPress={() => setModalVisible(true)}
         activeOpacity={0.7}
       >
-        <Text style={[styles.triggerText, { color: theme.textSecondary }]}>
+        <Text style={[styles.triggerText, { color: theme.textSecondary, fontSize: triggerTextSize }]}>
           ▼ {selectedOption ? selectedOption.label : 'Select'}
         </Text>
       </TouchableOpacity>
@@ -97,7 +106,7 @@ export function SelectionDropdown<T>({
       <Modal
         visible={modalVisible}
         transparent={true}
-        animationType={isTablet ? 'fade' : 'slide'}
+        animationType={isCenteredLayout ? 'fade' : 'slide'}
         onRequestClose={() => setModalVisible(false)}
       >
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
@@ -106,8 +115,8 @@ export function SelectionDropdown<T>({
               styles.modalBackdrop,
               {
                 backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                justifyContent: isTablet ? 'center' : 'flex-end',
-                alignItems: isTablet ? 'center' : 'stretch',
+                justifyContent: isCenteredLayout ? 'center' : 'flex-end',
+                alignItems: isCenteredLayout ? 'center' : 'stretch',
               },
             ]}
           >
@@ -119,22 +128,22 @@ export function SelectionDropdown<T>({
                   {
                     backgroundColor: theme.card,
                     borderColor: theme.border,
-                    borderWidth: isTablet ? 1 : 0,
-                    width: isTablet ? 340 : '100%',
-                    maxHeight: isTablet ? 450 : 380,
-                    borderRadius: isTablet ? 24 : 0,
+                    borderWidth: isCenteredLayout ? 1 : 0,
+                    width: isCenteredLayout ? (isDesktop ? 400 : 340) : '100%',
+                    maxHeight: isCenteredLayout ? (isDesktop ? 550 : 450) : 380,
+                    borderRadius: isCenteredLayout ? 24 : 0,
                     borderTopLeftRadius: 24,
                     borderTopRightRadius: 24,
-                    paddingBottom: isTablet ? 24 : Math.max(24, insets.bottom),
+                    paddingBottom: isCenteredLayout ? 24 : Math.max(24, insets.bottom),
                   },
                 ]}
               >
                 {/* Drag Indicator for Phones Bottom-Sheet style */}
-                {!isTablet && <View style={[styles.dragIndicator, { backgroundColor: theme.border }]} />}
+                {!isCenteredLayout && <View style={[styles.dragIndicator, { backgroundColor: theme.border }]} />}
 
                 {/* Modal Header */}
                 <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { color: theme.textSecondary }]}>
+                  <Text style={[styles.modalTitle, { color: theme.textSecondary, fontSize: isDesktop ? 15 : 12 }]}>
                     {title}
                   </Text>
                 </View>

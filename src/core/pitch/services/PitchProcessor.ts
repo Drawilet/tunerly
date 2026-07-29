@@ -50,11 +50,10 @@ export class PitchProcessor {
     calibrationA4 = 440,
     confidenceThreshold = 0.5
   ): DetectedPitch | null {
-    // If frequency is invalid, outside standard instrument ranges, or confidence is too low, treat as no signal.
-    // 30Hz is flat D1 (36.7Hz) for Bass, 1000Hz is sharp E4/E5 with plenty of headroom.
+    // 20Hz is flat E0/A0, 1500Hz is high F#6 with plenty of headroom.
     if (
-      frequency < 30 ||
-      frequency > 1000 ||
+      frequency < 20 ||
+      frequency > 1500 ||
       confidence < confidenceThreshold ||
       isNaN(frequency)
     ) {
@@ -63,7 +62,9 @@ export class PitchProcessor {
 
     // 1. Calculate played chromatic note details
     const playedMidi = this.frequencyToMidi(frequency, calibrationA4);
-    const { noteName, octave } = this.midiToNoteDetails(playedMidi);
+    const closestMidi = Math.round(playedMidi);
+    const { noteName, octave } = this.midiToNoteDetails(closestMidi);
+    const chromaticFrequency = this.midiToFrequency(closestMidi, calibrationA4);
 
     // 2. Select the target note
     let targetNote: StringNote;
@@ -73,28 +74,36 @@ export class PitchProcessor {
       targetNote = selectedNote;
     } else {
       // Auto Mode: automatically detect the closest string from the tuning list
-      let closestNote = tuningNotes[0];
-      let minDiff = Infinity;
+      // BUT for chromatic behavior, the actual cents calculation is done relative to the closest chromatic note!
+      // If the closest chromatic note matches one of the tuning strings, we use that tuning string as the target note.
+      // If it doesn't match any tuning string, we create a temporary StringNote representing the chromatic note.
+      
+      const matchedTuningNote = tuningNotes.find((note) => {
+        const noteMidi = this.frequencyToMidi(note.frequency, calibrationA4);
+        return Math.round(noteMidi) === closestMidi;
+      });
 
-      for (const note of tuningNotes) {
-        const diff = Math.abs(frequency - note.frequency);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestNote = note;
-        }
+      if (matchedTuningNote) {
+        targetNote = matchedTuningNote;
+      } else {
+        targetNote = {
+          id: `chromatic-${closestMidi}`,
+          name: noteName,
+          octave: octave,
+          frequency: chromaticFrequency,
+        };
       }
-      targetNote = closestNote;
     }
 
     // 3. Calculate deviation in cents relative to the target note's exact frequency
-    // Formula: cents = 1200 * log2(f_actual / f_target)
     const cents = 1200 * Math.log2(frequency / targetNote.frequency);
 
     // 4. Calculate statuses
-    // Is the played chromatic note the same MIDI note as the target note?
-    const targetMidi = this.frequencyToMidi(targetNote.frequency, calibrationA4);
-    const isTargetNote = Math.round(playedMidi) === Math.round(targetMidi);
-    
+    // Is the played chromatic note one of the active tuning strings?
+    const isTargetNote = selectedNote
+      ? closestMidi === Math.round(this.frequencyToMidi(selectedNote.frequency, calibrationA4))
+      : tuningNotes.some((note) => Math.round(this.frequencyToMidi(note.frequency, calibrationA4)) === closestMidi);
+
     // In-tune definitions
     const absCents = Math.abs(cents);
     const isClose = absCents <= 5;
