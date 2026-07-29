@@ -9,7 +9,7 @@ import { useTunerStore } from '../state/useTunerStore';
 import { SUPPORTED_INSTRUMENTS, Instrument } from '../../domain/models/TunerModels';
 import { useTheme } from '../hooks/useTheme';
 import { HapticsService } from '@/core/haptics/services/HapticsService';
-import { Fonts } from '@/constants/theme';
+import { Fonts, Animation, BorderRadius, Spacing } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 
 export function InstrumentSelector() {
@@ -27,10 +27,7 @@ export function InstrumentSelector() {
   const translateX = useSharedValue(activeIndex * tabWidth);
 
   useEffect(() => {
-    translateX.value = withSpring(activeIndex * tabWidth, {
-      damping: 20,
-      stiffness: 150,
-    });
+    translateX.value = withSpring(activeIndex * tabWidth, Animation.Spring);
   }, [activeIndex, tabWidth, translateX]);
 
   const activeIndicatorStyle = useAnimatedStyle(() => {
@@ -132,7 +129,7 @@ export function InstrumentSelector() {
                 styles.tabLabel,
                 {
                   color: isSelected ? theme.accent : theme.textTertiary,
-                  fontFamily: isSelected ? Fonts.bold : Fonts.regular,
+                  fontFamily: isSelected ? Fonts.semiBold : Fonts.regular,
                 },
               ]}
             >
@@ -148,7 +145,7 @@ export function InstrumentSelector() {
 const styles = StyleSheet.create({
   container: {
     height: 64,
-    borderRadius: 16,
+    borderRadius: BorderRadius.lg,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 3,
@@ -157,12 +154,12 @@ const styles = StyleSheet.create({
   },
   activeIndicator: {
     height: '100%',
-    borderRadius: 13,
+    borderRadius: BorderRadius.md,
     position: 'absolute',
     left: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -171,7 +168,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
-    gap: 4,
+    gap: Spacing.xs,
   },
   tabLabel: {
     fontSize: 11,

@@ -1,10 +1,8 @@
 import { version } from 'expo/package.json';
 import { Image } from 'expo-image';
 import { useColorScheme, StyleSheet } from 'react-native';
-
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
-
 import { Spacing } from '@/constants/theme';
 
 export function WebBadge() {
@@ -29,9 +27,9 @@ export function WebBadge() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: Spacing.five,
+    padding: Spacing.xl,
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: Spacing.sm,
   },
   versionText: {
     textAlign: 'center',

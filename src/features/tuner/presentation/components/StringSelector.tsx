@@ -5,7 +5,7 @@ import { useTuner } from '../hooks/useTuner';
 import { StringNote } from '../../domain/models/TunerModels';
 import { useTheme } from '../hooks/useTheme';
 import { HapticsService } from '@/core/haptics/services/HapticsService';
-import { Fonts } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 
 export function StringSelector() {
@@ -66,7 +66,7 @@ export function StringSelector() {
               styles.pegText,
               {
                 color: !selectedNote ? '#FFFFFF' : theme.textSecondary,
-                fontFamily: !selectedNote ? Fonts.bold : Fonts.semiBold,
+                fontFamily: !selectedNote ? Fonts.semiBold : Fonts.regular,
                 fontSize: pegFontSize,
               },
             ]}
@@ -81,10 +81,10 @@ export function StringSelector() {
           const isActive = activeNote?.id === note.id;
 
           // Background styling for native iOS buttons
-          let buttonBg = theme.card;
-          let buttonBorder = theme.border;
-          let textColor = theme.textSecondary;
-          let octaveColor = theme.textTertiary;
+          let buttonBg: string = theme.card;
+          let buttonBorder: string = theme.border;
+          let textColor: string = theme.textSecondary;
+          let octaveColor: string = theme.textTertiary;
 
           if (isSelected) {
             buttonBg = theme.accent;
@@ -119,7 +119,7 @@ export function StringSelector() {
                   styles.pegText,
                   {
                     color: textColor,
-                    fontFamily: isSelected || isActive ? Fonts.bold : Fonts.semiBold,
+                    fontFamily: isSelected || isActive ? Fonts.semiBold : Fonts.regular,
                     fontSize: pegFontSize,
                   },
                 ]}
@@ -132,6 +132,7 @@ export function StringSelector() {
                   {
                     color: octaveColor,
                     fontSize: octaveFontSize,
+                    fontFamily: Fonts.regular,
                   },
                 ]}
               >
@@ -149,7 +150,7 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     alignItems: 'center',
-    gap: 16,
+    gap: Spacing.sm,
     paddingVertical: 12,
   },
   header: {
@@ -157,38 +158,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tuningLabel: {
-    fontSize: 13,
-    fontFamily: Fonts.bold,
+    fontSize: 12,
+    fontFamily: Fonts.regular,
     letterSpacing: 0.5,
   },
   selectorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
     width: '100%',
     flexWrap: 'wrap',
     paddingHorizontal: 16,
   },
   pegButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1,
+    borderWidth: 0.5,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 2,
   },
   pegText: {
-    fontSize: 14,
+    textAlign: 'center',
   },
   octaveText: {
-    fontSize: 9,
-    fontFamily: Fonts.bold,
-    marginTop: 1,
+    marginTop: 0.5,
   },
 });

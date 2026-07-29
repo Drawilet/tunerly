@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View, Text, StatusBar, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, StatusBar, TouchableOpacity } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTuner } from '@/features/tuner/presentation/hooks/useTuner';
 import { useTunerStore } from '@/features/tuner/presentation/state/useTunerStore';
@@ -9,9 +9,10 @@ import { InstrumentSelector } from '@/features/tuner/presentation/components/Ins
 import { TuningSelector } from '@/features/tuner/presentation/components/TuningSelector';
 import { PermissionGate } from '@/features/tuner/presentation/components/PermissionGate';
 import { useTheme } from '@/features/tuner/presentation/hooks/useTheme';
-import { Fonts } from '@/constants/theme';
+import { Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { DebugOverlay } from '@/features/tuner/presentation/components/DebugOverlay';
 import { useResponsive } from '@/hooks/useResponsive';
+import { ThemedText } from '@/components/themed-text';
 
 const queryClient = new QueryClient();
 
@@ -84,17 +85,20 @@ function TunerScreen() {
       >
         {/* Brand Header */}
         <View style={styles.header}>
-          <Text style={[styles.brandTitle, { color: theme.text }]}>TUNERLY</Text>
-          <Text style={[styles.brandSubtitle, { color: theme.textTertiary }]}>chromatic tuner</Text>
+          <ThemedText style={styles.brandTitle}>TUNERLY</ThemedText>
+          <ThemedText themeColor="textTertiary" style={styles.brandSubtitle}>chromatic tuner</ThemedText>
           
           <TouchableOpacity
-            style={[styles.debugToggle, { borderColor: theme.border }]}
+            style={[styles.debugToggle, { borderColor: theme.border, backgroundColor: theme.card }]}
             onPress={() => setShowDebug(!showDebug)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.debugToggleText, { color: showDebug ? theme.accent : theme.textTertiary }]}>
+            <ThemedText
+              themeColor={showDebug ? 'primary' : 'textTertiary'}
+              style={styles.debugToggleText}
+            >
               DEBUG
-            </Text>
+            </ThemedText>
           </TouchableOpacity>
         </View>
 
@@ -138,7 +142,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: Spacing.sm,
     gap: 2,
     width: '100%',
     position: 'relative',
@@ -149,30 +153,32 @@ const styles = StyleSheet.create({
     right: 20,
     top: 6,
     borderWidth: 0.5,
-    borderRadius: 8,
+    borderRadius: BorderRadius.sm,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   debugToggleText: {
     fontSize: 9,
-    fontFamily: Fonts.bold,
+    letterSpacing: 0.5,
+    fontFamily: Fonts.semiBold,
   },
   brandTitle: {
-    fontSize: 15,
-    letterSpacing: 6,
-    fontFamily: Fonts.bold,
+    fontSize: 14,
+    letterSpacing: 5,
+    fontFamily: Fonts.semiBold,
+    textTransform: 'uppercase',
   },
   brandSubtitle: {
     fontSize: 9,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    fontFamily: Fonts.semiBold,
+    fontFamily: Fonts.regular,
   },
   selectorsPanel: {
     width: '100%',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
   },
   tunerWrapper: {
     flex: 1,
@@ -182,6 +188,6 @@ const styles = StyleSheet.create({
   },
   selectorWrapper: {
     width: '100%',
-    paddingBottom: 8,
+    paddingBottom: Spacing.sm,
   },
 });

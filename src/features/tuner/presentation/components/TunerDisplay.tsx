@@ -12,7 +12,7 @@ import Animated, {
 import { useTunerStore } from '../state/useTunerStore';
 import { useTheme } from '../hooks/useTheme';
 import { InstrumentIllustration } from './InstrumentIllustration';
-import { Fonts } from '@/constants/theme';
+import { Fonts, Animation, Spacing, BorderRadius } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 
 const TICK_COUNT = 11; // -50 to +50 in steps of 10
@@ -33,8 +33,8 @@ export function TunerDisplay() {
   const noteFontSize = isCompact ? 40 : (isTablet ? 64 : 56);
   const octaveFontSize = isCompact ? 14 : (isTablet ? 22 : 18);
   const illustrationHeight = isCompact ? 100 : (isTablet ? 200 : 160);
-  const dotSize = isCompact ? 10 : 12;
-  const borderWidth = 3.5;
+  const dotSize = isCompact ? 8 : 10;
+  const borderWidth = 1.5;
 
   const centsShared = useSharedValue(0);
   const inTuneOpacity = useSharedValue(0);
@@ -42,19 +42,15 @@ export function TunerDisplay() {
   // Update needle position and in-tune glow
   useEffect(() => {
     if (currentPitch) {
-      // Spring needle animation
-      centsShared.value = withSpring(currentPitch.cents, {
-        damping: 18,
-        stiffness: 100,
-        mass: 0.8,
-      });
+      // Spring needle animation using unified HIG spring
+      centsShared.value = withSpring(currentPitch.cents, Animation.Spring);
 
       // Animate in-tune glow (threshold is 2 cents)
-      inTuneOpacity.value = withTiming(currentPitch.isInTune ? 1 : 0, { duration: 150 });
+      inTuneOpacity.value = withTiming(currentPitch.isInTune ? 1 : 0, { duration: Animation.Duration.fast });
     } else {
       // Settle back to center when no pitch is detected
-      centsShared.value = withSpring(0, { damping: 20 });
-      inTuneOpacity.value = withTiming(0, { duration: 150 });
+      centsShared.value = withSpring(0, Animation.Spring);
+      inTuneOpacity.value = withTiming(0, { duration: Animation.Duration.fast });
     }
   }, [currentPitch, centsShared, inTuneOpacity]);
 
@@ -84,10 +80,10 @@ export function TunerDisplay() {
     const borderColor = interpolateColor(
       inTuneOpacity.value,
       [0, 1],
-      [theme.accent, theme.success]
+      [theme.border, theme.success]
     );
 
-    const shadowOpacity = interpolate(inTuneOpacity.value, [0, 1], [0.15, 0.45]);
+    const shadowOpacity = interpolate(inTuneOpacity.value, [0, 1], [0.03, 0.2]);
 
     return {
       borderColor,
@@ -190,9 +186,9 @@ export function TunerDisplay() {
               borderRadius: ringSize / 2,
               borderWidth: borderWidth,
               backgroundColor: theme.card,
-              shadowOffset: { width: 0, height: 4 },
-              shadowRadius: 10,
-              elevation: 4,
+              shadowOffset: { width: 0, height: 2 },
+              shadowRadius: 8,
+              elevation: 2,
             },
           ]}
         >
@@ -269,10 +265,12 @@ export function TunerDisplay() {
             width: SCALE_WIDTH,
             backgroundColor: theme.card,
             borderColor: theme.border,
+            borderWidth: 0.5,
+            shadowColor: '#000',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: theme.isDark ? 0 : 0.05,
-            shadowRadius: 12,
-            elevation: 3,
+            shadowOpacity: theme.isDark ? 0 : 0.03,
+            shadowRadius: 10,
+            elevation: 1,
           },
         ]}
       >
@@ -282,9 +280,9 @@ export function TunerDisplay() {
               styles.centsLabel,
               {
                 color: isCalibrating
-                  ? '#FF9500'
+                  ? theme.warning
                   : (currentPitch?.isInTune ? theme.success : theme.textSecondary),
-                fontFamily: isCalibrating || currentPitch?.isInTune ? Fonts.bold : Fonts.semiBold,
+                fontFamily: isCalibrating || currentPitch?.isInTune ? Fonts.semiBold : Fonts.regular,
               },
             ]}
           >
@@ -307,7 +305,7 @@ export function TunerDisplay() {
                 styles.scaleLabel,
                 {
                   color: currentPitch?.isInTune ? theme.success : theme.textTertiary,
-                  fontFamily: currentPitch?.isInTune ? Fonts.bold : Fonts.regular,
+                  fontFamily: currentPitch?.isInTune ? Fonts.semiBold : Fonts.regular,
                 },
               ]}
             >
@@ -328,7 +326,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
+    gap: Spacing.md,
     width: '100%',
   },
   tuningRingWrapper: {
@@ -340,7 +338,7 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    borderWidth: 3.5,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -353,14 +351,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   indicatorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    top: -7.5,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    top: -5,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   noteContent: {
     justifyContent: 'center',
@@ -368,9 +366,9 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   instrumentLabel: {
-    fontSize: 10,
-    fontFamily: Fonts.bold,
-    letterSpacing: 1.5,
+    fontSize: 9,
+    fontFamily: Fonts.semiBold,
+    letterSpacing: 2,
   },
   noteLabelWrapper: {
     flexDirection: 'row',
@@ -378,17 +376,17 @@ const styles = StyleSheet.create({
   },
   noteText: {
     fontSize: 56,
-    fontFamily: Fonts.bold,
+    fontFamily: Fonts.semiBold,
     lineHeight: 64,
   },
   octaveText: {
     fontSize: 18,
-    fontFamily: Fonts.bold,
-    marginTop: 6,
+    fontFamily: Fonts.regular,
+    marginTop: 4,
   },
   frequencyText: {
-    fontSize: 13,
-    fontFamily: Fonts.semiBold,
+    fontSize: 12,
+    fontFamily: Fonts.regular,
     letterSpacing: 0.3,
   },
   illustrationContainer: {
@@ -397,16 +395,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scaleCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 16,
-    gap: 12,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 0.5,
+    padding: Spacing.md,
+    gap: Spacing.sm,
   },
   scaleHeader: {
     alignItems: 'center',
   },
   centsLabel: {
-    fontSize: 14,
+    fontSize: 13,
     textTransform: 'lowercase',
   },
   scaleBoard: {
@@ -422,16 +420,16 @@ const styles = StyleSheet.create({
   tick: {
     position: 'absolute',
     width: 1,
-    height: 6,
+    height: 4,
     bottom: 0,
   },
   majorTick: {
-    height: 10,
+    height: 8,
   },
   centerTick: {
-    width: 2.5,
-    height: 14,
-    borderRadius: 1,
+    width: 1.5,
+    height: 12,
+    borderRadius: 0.75,
   },
   labelsWrapper: {
     flexDirection: 'row',
@@ -444,15 +442,15 @@ const styles = StyleSheet.create({
   },
   needle: {
     position: 'absolute',
-    width: 2.5,
-    height: 36,
-    top: -14,
+    width: 1.5,
+    height: 32,
+    top: -12,
     left: '50%',
-    marginLeft: -1.25,
-    borderRadius: 1,
+    marginLeft: -0.75,
+    borderRadius: 0.75,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
 });
