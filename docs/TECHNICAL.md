@@ -74,14 +74,32 @@ graph LR
 Tunerly avoids hardcoded layout dimensions in favor of a dynamic hook: [useResponsive](file:///home/drawilet/projects/tunerly/src/hooks/useResponsive.ts).
 
 ### Screen Classifications
-* **Compact (`height < 700 || width < 360`):** Optimizes spacing, scales down the tuning ring, and scales down string selectors so they fit in a single row.
-* **Regular (Standard Phones):** Standard layout bounds.
-* **Tablet (`width >= 600`):** Centers content inside a maximum width layout card (800px max) and provides comfortable margins.
+
+Six named breakpoints (all widths in CSS device-independent pixels):
+
+| Breakpoint | Width range | Alias flag |
+|---|---|---|
+| `compactMobile` | < 360 | `isCompact` |
+| `regularMobile` | 360–599 | `isRegular` |
+| `tablet` | 600–1023 | `isTablet` |
+| `laptop` | 1024–1279 | `isLaptop` |
+| `desktop` | 1280–1535 | `isDesktop` |
+| `largeDesktop` | ≥ 1536 | `isLargeDesktop` |
+
+`isDesktop` is `true` for both `desktop` and `largeDesktop` to remain backward-compatible with existing consumers.
+
+`isWideLayout` is `true` for tablet and above — use it to enable max-width centering.
 
 ### System Tokens Exposed
-- `spacing`: Scalable spacing dictionary (`xs`, `sm`, `md`, `lg`, `xl`, `xxl`).
-- `fontScale`: Font size multiplier.
+- `spacing`: Continuous spacing dictionary (`xs`–`xxl`) interpolated linearly from mobile (390 px) to desktop (1440 px) anchors. Values grow smoothly instead of snapping.
+- `fontScale`: Continuous font-size multiplier (1.0 at 390 px → 1.5 at 1536 px).
+- `tunerScale`: Continuous proportional scale factor (0.85 at 320 px → 2.0 cap at large widths). Drives `TunerDisplay` sizing independently per-dimension via `scaleDim(ref, tunerScale, min, max)`.
+- `contentMaxWidth`: Maximum content width per breakpoint tier (600 → 1400 px).
 - `insets`: Safe area boundaries to prevent notch and home indicator clipping.
+
+### Zoom Stability
+Components must not re-subtract parent padding from `width` when computing child widths (double-subtraction). Use `width: '100%'` with `maxWidth` caps instead.  The `global.css` sets `box-sizing: border-box`, `overflow-x: hidden`, and `font-size: 100%` to ensure the browser's zoom scaling is respected rather than overridden.
+
 
 ---
 

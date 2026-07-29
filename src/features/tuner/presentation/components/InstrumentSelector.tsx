@@ -15,26 +15,32 @@ import { useResponsive } from '@/hooks/useResponsive';
 export function InstrumentSelector() {
   const theme = useTheme();
   const { activeInstrument, setInstrument } = useTunerStore();
-  const { width: windowWidth, spacing, isCompact, isTablet, isDesktop } = useResponsive();
+  const { tunerScale, isWideLayout } = useResponsive();
 
-  // Define total control width based on screen width
-  const containerWidth = Math.min(windowWidth - spacing.md * 2, isDesktop ? 600 : (isTablet ? 450 : 360));
-  const containerHeight = isDesktop ? 76 : (isTablet ? 70 : 64);
-  const tabLabelFontSize = isCompact ? 10 : (isDesktop ? 14 : (isTablet ? 12 : 11));
-  const tabWidth = (containerWidth - 6) / 4; // 4 items, 3px padding on each side
+  // Use percentage width with a maxWidth cap instead of re-subtracting parent padding.
+  // The parent already applies horizontal padding; this avoids double-subtraction.
+  const containerMaxWidth = isWideLayout ? 600 : 380;
+  const containerHeight = Math.round(64 * Math.min(1.25, tunerScale));
+  const tabLabelFontSize = Math.round(11 * Math.min(1.3, tunerScale));
+  // tabWidth is computed dynamically inside render via onLayout; use '25%' flex instead.
+  const tabFlex = 1;
 
   // Find active index
   const activeIndex = SUPPORTED_INSTRUMENTS.findIndex((inst) => inst.id === activeInstrument.id);
 
-  const translateX = useSharedValue(activeIndex * tabWidth);
+  // Animate the indicator using a percentage index (0–3) mapped to left: 0%, 25%, 50%, 75%.
+  // This avoids a fixed pixel tabWidth that would be stale when flex layout changes.
+  const indicatorIndex = useSharedValue(activeIndex);
 
   useEffect(() => {
-    translateX.value = withSpring(activeIndex * tabWidth, Animation.Spring);
-  }, [activeIndex, tabWidth, translateX]);
+    indicatorIndex.value = withSpring(activeIndex, Animation.Spring);
+  }, [activeIndex, indicatorIndex]);
 
   const activeIndicatorStyle = useAnimatedStyle(() => {
+    // Each tab occupies 25% of the container; translate by that amount per step.
     return {
-      transform: [{ translateX: translateX.value }],
+      transform: [{ translateX: 0 }],
+      left: `${indicatorIndex.value * 25}%`,
     };
   });
 
@@ -48,7 +54,7 @@ export function InstrumentSelector() {
   // Render a minimal geometric representation icon for each instrument type
   const renderInstrumentIcon = (id: string, isSelected: boolean) => {
     const iconColor = isSelected ? theme.accent : theme.textTertiary;
-    const iconScale = isDesktop ? 1.35 : (isTablet ? 1.15 : 1.0);
+    const iconScale = Math.min(1.5, tunerScale);
 
     const getIcon = () => {
       switch (id) {
@@ -106,20 +112,21 @@ export function InstrumentSelector() {
       style={[
         styles.container,
         {
-          width: containerWidth,
+          width: '100%',
+          maxWidth: containerMaxWidth,
           height: containerHeight,
           backgroundColor: theme.isDark ? '#1C1C1E' : '#E5E5EA',
           borderColor: theme.border,
         },
       ]}
     >
-      {/* Sliding Tab Pill Background */}
+      {/* Sliding Tab Pill Background — width is set to 25% to match the flex tabs */}
       <Animated.View
         style={[
           styles.activeIndicator,
           activeIndicatorStyle,
           {
-            width: tabWidth,
+            width: '25%',
             backgroundColor: theme.isDark ? '#2C2C2E' : '#FFFFFF',
           },
         ]}
@@ -131,7 +138,7 @@ export function InstrumentSelector() {
         return (
           <TouchableOpacity
             key={inst.id}
-            style={[styles.tabButton, { width: tabWidth }]}
+            style={[styles.tabButton, { flex: tabFlex }]}
             onPress={() => handlePress(inst)}
             activeOpacity={0.7}
           >
@@ -164,6 +171,7 @@ const styles = StyleSheet.create({
     padding: 3,
     position: 'relative',
     borderWidth: 0.5,
+    alignSelf: 'center',
   },
   activeIndicator: {
     height: '100%',
@@ -182,6 +190,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1,
     gap: Spacing.xs,
+    flexShrink: 1,
   },
   tabLabel: {
     fontSize: 11,

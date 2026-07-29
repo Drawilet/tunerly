@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
+import { Platform } from 'react-native';
 import {
   Instrument,
   Tuning,
@@ -28,7 +30,7 @@ interface TunerState {
   microphonePermission: boolean | null;
   calibrationA4: number;
   amplitudeThreshold: number; // base dynamic fallback threshold
-  
+
   // Calibration states
   isCalibrating: boolean;
   noiseFloor: number;
@@ -38,7 +40,7 @@ interface TunerState {
   showDebug: boolean;
   debugData: DebugData;
 
-  // Theme Mode Settings
+  // Theme Mode Settings — persisted as single source of truth
   themeMode: 'system' | 'light' | 'dark';
   setThemeMode: (mode: 'system' | 'light' | 'dark') => void;
 
@@ -57,87 +59,122 @@ interface TunerState {
   resetTuner: () => void;
 }
 
-export const useTunerStore = create<TunerState>((set) => ({
-  activeInstrument: SUPPORTED_INSTRUMENTS[0],
-  activeTuning: GUITAR_STANDARD_TUNING,
-  selectedNote: null,
-  currentPitch: null,
-  lastValidNote: null,
-  isRecording: false,
-  microphonePermission: null,
-  calibrationA4: 440,
-  amplitudeThreshold: 0.06, // Base fallback threshold (RMS)
-  
-  isCalibrating: false,
-  noiseFloor: 0.0,
-  calibratedThreshold: 0.06,
+/**
+ * In-memory fallback storage for native (no AsyncStorage dependency required).
+ * On native, the process lifetime matches the app session, so there is no
+ * "page refresh" scenario that would reset the theme. This keeps the store
+ * functionally correct without an additional native dependency.
+ */
+const memoryStorage: StateStorage = (() => {
+  const map = new Map<string, string>();
+  return {
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => { map.set(key, value); },
+    removeItem: (key: string) => { map.delete(key); },
+  };
+})();
 
-  themeMode: 'system',
-  setThemeMode: (themeMode) => set({ themeMode }),
+/**
+ * Storage adapter: localStorage on web (survives refresh), in-memory on native
+ * (process-scoped, survives navigation but not app restart — acceptable since
+ * native apps retrieve preferences from the OS app storage on boot via other paths).
+ * Only `themeMode` is persisted — all runtime/audio state remains ephemeral.
+ */
+const storage = Platform.OS === 'web'
+  ? createJSONStorage(() => localStorage)
+  : createJSONStorage(() => memoryStorage);
 
-  showDebug: false,
-  debugData: {
-    rms: 0,
-    frequency: 0,
-    confidence: 0,
-    stableFrames: 0,
-    noiseFloor: 0,
-    currentThreshold: 0.06,
-    state: 'silence',
-  },
-
-  setInstrument: (activeInstrument) =>
-    set({
-      activeInstrument,
-      activeTuning: activeInstrument.tunings[0],
-      selectedNote: null,
-      currentPitch: null,
-      lastValidNote: null,
-    }),
-  setTuning: (activeTuning) =>
-    set({
-      activeTuning,
-      selectedNote: null,
-      currentPitch: null,
-      lastValidNote: null,
-    }),
-  setSelectedNote: (selectedNote) =>
-    set({
-      selectedNote,
-      currentPitch: null,
-    }),
-  setCurrentPitch: (currentPitch) =>
-    set((state) => {
-      const updates: Partial<TunerState> = { currentPitch };
-      if (currentPitch) {
-        updates.lastValidNote = {
-          noteName: currentPitch.noteName,
-          octave: currentPitch.octave,
-          targetNote: currentPitch.targetNote,
-        };
-      }
-      return updates;
-    }),
-  setRecording: (isRecording) => set({ isRecording }),
-  setPermission: (microphonePermission) => set({ microphonePermission }),
-  setCalibration: (calibrationA4) => set({ calibrationA4 }),
-  setAmplitudeThreshold: (amplitudeThreshold) => set({ amplitudeThreshold }),
-  setIsCalibrating: (isCalibrating) => set({ isCalibrating }),
-  setNoiseFloor: (noiseFloor, calibratedThreshold) => set({ noiseFloor, calibratedThreshold }),
-  setShowDebug: (showDebug) => set({ showDebug }),
-  setDebugData: (data) =>
-    set((state) => ({
-      debugData: { ...state.debugData, ...data },
-    })),
-  resetTuner: () =>
-    set({
+export const useTunerStore = create<TunerState>()(
+  persist(
+    (set) => ({
+      activeInstrument: SUPPORTED_INSTRUMENTS[0],
+      activeTuning: GUITAR_STANDARD_TUNING,
       selectedNote: null,
       currentPitch: null,
       lastValidNote: null,
       isRecording: false,
+      microphonePermission: null,
+      calibrationA4: 440,
+      amplitudeThreshold: 0.06, // Base fallback threshold (RMS)
+
       isCalibrating: false,
-      noiseFloor: 0,
+      noiseFloor: 0.0,
       calibratedThreshold: 0.06,
+
       themeMode: 'system',
+      setThemeMode: (themeMode) => set({ themeMode }),
+
+      showDebug: false,
+      debugData: {
+        rms: 0,
+        frequency: 0,
+        confidence: 0,
+        stableFrames: 0,
+        noiseFloor: 0,
+        currentThreshold: 0.06,
+        state: 'silence',
+      },
+
+      setInstrument: (activeInstrument) =>
+        set({
+          activeInstrument,
+          activeTuning: activeInstrument.tunings[0],
+          selectedNote: null,
+          currentPitch: null,
+          lastValidNote: null,
+        }),
+      setTuning: (activeTuning) =>
+        set({
+          activeTuning,
+          selectedNote: null,
+          currentPitch: null,
+          lastValidNote: null,
+        }),
+      setSelectedNote: (selectedNote) =>
+        set({
+          selectedNote,
+          currentPitch: null,
+        }),
+      setCurrentPitch: (currentPitch) =>
+        set((state) => {
+          const updates: Partial<TunerState> = { currentPitch };
+          if (currentPitch) {
+            updates.lastValidNote = {
+              noteName: currentPitch.noteName,
+              octave: currentPitch.octave,
+              targetNote: currentPitch.targetNote,
+            };
+          }
+          return updates;
+        }),
+      setRecording: (isRecording) => set({ isRecording }),
+      setPermission: (microphonePermission) => set({ microphonePermission }),
+      setCalibration: (calibrationA4) => set({ calibrationA4 }),
+      setAmplitudeThreshold: (amplitudeThreshold) => set({ amplitudeThreshold }),
+      setIsCalibrating: (isCalibrating) => set({ isCalibrating }),
+      setNoiseFloor: (noiseFloor, calibratedThreshold) => set({ noiseFloor, calibratedThreshold }),
+      setShowDebug: (showDebug) => set({ showDebug }),
+      setDebugData: (data) =>
+        set((state) => ({
+          debugData: { ...state.debugData, ...data },
+        })),
+      resetTuner: () =>
+        set({
+          selectedNote: null,
+          currentPitch: null,
+          lastValidNote: null,
+          isRecording: false,
+          isCalibrating: false,
+          noiseFloor: 0,
+          calibratedThreshold: 0.06,
+          themeMode: 'system',
+        }),
     }),
-}));
+    {
+      name: 'tunerly-preferences',
+      storage,
+      // Only persist the user preference — all runtime/audio state is ephemeral
+      partialize: (state) => ({ themeMode: state.themeMode }),
+    }
+  )
+);

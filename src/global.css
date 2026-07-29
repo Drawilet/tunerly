@@ -1,3 +1,39 @@
+/*
+ * Global Web Styles
+ * Ensures stable layout at all browser zoom levels by:
+ * - Respecting the browser's base font size (100%) for correct rem scaling
+ * - Preventing horizontal overflow during zoom
+ * - Using dvh for full-height layouts that account for mobile browser chrome
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%; /* Respect the browser's base font preference — critical for zoom scaling */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
 :root {
   --font-display:
     Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,

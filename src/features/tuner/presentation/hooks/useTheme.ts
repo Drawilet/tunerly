@@ -1,4 +1,5 @@
-import { useColorScheme, Platform } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Platform } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { useTunerStore } from '../state/useTunerStore';
 import { useEffect } from 'react';

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View, StatusBar, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, StatusBar, TouchableOpacity, Platform } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTuner } from '@/features/tuner/presentation/hooks/useTuner';
 import { useTunerStore } from '@/features/tuner/presentation/state/useTunerStore';
@@ -9,7 +9,7 @@ import { InstrumentSelector } from '@/features/tuner/presentation/components/Ins
 import { TuningSelector } from '@/features/tuner/presentation/components/TuningSelector';
 import { PermissionGate } from '@/features/tuner/presentation/components/PermissionGate';
 import { useTheme } from '@/features/tuner/presentation/hooks/useTheme';
-import { Fonts, BorderRadius, Spacing } from '@/constants/theme';
+import { Fonts, BorderRadius } from '@/constants/theme';
 import { DebugOverlay } from '@/features/tuner/presentation/components/DebugOverlay';
 import { useResponsive } from '@/hooks/useResponsive';
 import { ThemedText } from '@/components/themed-text';
@@ -22,7 +22,14 @@ function TunerScreen() {
   const microphonePermission = useTunerStore((s) => s.microphonePermission);
   const showDebug = useTunerStore((s) => s.showDebug);
   const setShowDebug = useTunerStore((s) => s.setShowDebug);
-  const { insets, isTablet, isDesktop, contentMaxWidth, spacing } = useResponsive();
+  const {
+    insets,
+    isWideLayout,
+    contentMaxWidth,
+    spacing,
+    tunerScale,
+    height,
+  } = useResponsive();
 
   // Auto-start listening on screen mount
   useEffect(() => {
@@ -77,6 +84,18 @@ function TunerScreen() {
     );
   }
 
+  /**
+   * Tuner wrapper height budget:
+   * On web the flex container can grow to fill the full viewport height if
+   * there is surplus space.  Cap the tuner area so the instrument illustration
+   * and gauge do not become comically large on tall laptop/desktop displays.
+   * The cap is proportional to the tuner scale so it still grows on wider
+   * screens.
+   */
+  const tunerMaxHeight = Platform.OS === 'web'
+    ? Math.min(height * 0.65, 480 * tunerScale)
+    : undefined;
+
   return (
     <View
       style={[
@@ -88,7 +107,6 @@ function TunerScreen() {
           paddingLeft: insets.left + spacing.md,
           paddingRight: insets.right + spacing.md,
           alignItems: 'center',
-          justifyContent: 'center',
         },
       ]}
     >
@@ -96,18 +114,28 @@ function TunerScreen() {
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
       />
-      
+
+      {/*
+        Inner content column:
+        - width: 100% up to contentMaxWidth
+        - Uses gap-based spacing instead of justifyContent: 'space-between'
+          so components don't spread unpredictably when viewport changes.
+        - On web, centered horizontally via alignSelf: 'center'.
+      */}
       <View
         style={{
           flex: 1,
           width: '100%',
-          maxWidth: (isTablet || isDesktop) ? contentMaxWidth : '100%',
-          justifyContent: 'space-between',
+          maxWidth: isWideLayout ? contentMaxWidth : '100%',
+          alignSelf: 'center',
           alignItems: 'center',
+          gap: spacing.md,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.sm,
         }}
       >
         {/* Brand Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingHorizontal: spacing.sm }]}>
           <TouchableOpacity
             style={[styles.themeToggle, { borderColor: theme.border, backgroundColor: theme.card }]}
             onPress={toggleTheme}
@@ -123,7 +151,7 @@ function TunerScreen() {
 
           <ThemedText style={styles.brandTitle}>TUNERLY</ThemedText>
           <ThemedText themeColor="textTertiary" style={styles.brandSubtitle}>chromatic tuner</ThemedText>
-          
+
           <TouchableOpacity
             style={[styles.debugToggle, { borderColor: theme.border, backgroundColor: theme.card }]}
             onPress={() => setShowDebug(!showDebug)}
@@ -139,13 +167,13 @@ function TunerScreen() {
         </View>
 
         {/* Selectors Panel (Instrument + Tuning) */}
-        <View style={styles.selectorsPanel}>
+        <View style={[styles.selectorsPanel, { gap: spacing.xs }]}>
           <InstrumentSelector />
           <TuningSelector />
         </View>
 
         {/* Main Tuner Illustration & Gauge Dial */}
-        <View style={styles.tunerWrapper}>
+        <View style={[styles.tunerWrapper, tunerMaxHeight ? { maxHeight: tunerMaxHeight } : {}]}>
           <TunerDisplay />
         </View>
 
@@ -178,7 +206,6 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginTop: Spacing.sm,
     gap: 2,
     width: '100%',
     position: 'relative',
@@ -227,8 +254,6 @@ const styles = StyleSheet.create({
   selectorsPanel: {
     width: '100%',
     alignItems: 'center',
-    gap: Spacing.sm,
-    marginTop: Spacing.xs,
   },
   tunerWrapper: {
     flex: 1,
@@ -238,6 +263,5 @@ const styles = StyleSheet.create({
   },
   selectorWrapper: {
     width: '100%',
-    paddingBottom: Spacing.sm,
   },
 });
