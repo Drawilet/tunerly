@@ -2,7 +2,7 @@ import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets, EdgeInsets } from 'react-native-safe-area-context';
 
 /**
- * Breakpoint tier names (ordered smallest → largest).
+ * Width breakpoint tier names (ordered smallest → largest).
  *
  * Thresholds are based on CSS device-independent pixels (same unit that
  * useWindowDimensions reports on web):
@@ -22,26 +22,65 @@ export type Breakpoint =
   | 'desktop'
   | 'largeDesktop';
 
+/**
+ * Height class derived from usable screen height (after safe-area insets).
+ *
+ * compact   < 700 px  – iPhone SE, very short screens
+ * regular   700–799   – iPhone 11 / 13 / 15 (standard phones)
+ * expanded  ≥ 800 px  – large phones, tablets, desktops
+ */
+export type HeightClass = 'compact' | 'regular' | 'expanded';
+
 export interface ResponsiveValues {
-  // ── Breakpoint flags ──────────────────────────────────────────────────────
+  // ── Width breakpoint flags ─────────────────────────────────────────────────
   breakpoint: Breakpoint;
 
   /** Convenience aliases (backward-compatible with existing consumers) */
-  isCompact: boolean;   // compactMobile
-  isRegular: boolean;   // regularMobile
-  isTablet: boolean;    // tablet
-  isLaptop: boolean;    // laptop
-  isDesktop: boolean;   // desktop | largeDesktop
-  isLargeDesktop: boolean; // largeDesktop
+  isCompact: boolean;       // compactMobile
+  isRegular: boolean;       // regularMobile
+  isTablet: boolean;        // tablet
+  isLaptop: boolean;        // laptop
+  isDesktop: boolean;       // desktop | largeDesktop
+  isLargeDesktop: boolean;  // largeDesktop
 
   /** True for any breakpoint that benefits from a centered max-width container */
-  isWideLayout: boolean; // tablet | laptop | desktop | largeDesktop
+  isWideLayout: boolean;    // tablet | laptop | desktop | largeDesktop
 
-  // ── Spacing ───────────────────────────────────────────────────────────────
+  // ── Height class flags ────────────────────────────────────────────────────
+  /**
+   * Screen height category based on usable height (viewport minus safe-area
+   * insets).  Used to adapt vertical spacing and optionally hide decorative
+   * elements on short devices without shrinking critical controls.
+   */
+  heightClass: HeightClass;
+  isCompactHeight: boolean;   // < 700 px usable
+  isRegularHeight: boolean;   // 700–799 px usable
+  isExpandedHeight: boolean;  // >= 800 px usable
+
+  /**
+   * Continuous vertical scale multiplier (0.85–1.0–1.2).
+   * Reference: 1.0 at 750 px usable height.
+   * Used to adapt vertical spacing / illustration size independently of
+   * the horizontal tunerScale.
+   */
+  verticalScale: number;
+
+  /**
+   * Vertical spacing dictionary that scales with verticalScale instead of
+   * screen width, ensuring top/bottom breathing room adapts to height.
+   */
+  vSpacing: {
+    xs: number;
+    sm: number;
+    md: number;
+    lg: number;
+    xl: number;
+  };
+
+  // ── Horizontal Spacing ────────────────────────────────────────────────────
   /**
    * Spacing dictionary that scales smoothly with viewport width rather than
-   * snapping between discrete values.  Values are computed by linearly
-   * interpolating between the mobile and desktop anchor points.
+   * snapping between discrete values.
    */
   spacing: {
     xs: number;
@@ -61,9 +100,10 @@ export interface ResponsiveValues {
   contentMaxWidth: number;
 
   /**
-   * Continuous tuner scale factor (0.75 – 2.0).
+   * Continuous tuner scale factor (0.75–2.0).
    * Drives TunerDisplay sizing proportionally instead of discrete size jumps.
    * Reference point: 1.0 at 390 px (iPhone 14 width).
+   * NOTE: This is WIDTH-only. Use verticalScale for height-sensitive sizing.
    */
   tunerScale: number;
 
@@ -71,6 +111,8 @@ export interface ResponsiveValues {
   insets: EdgeInsets;
   width: number;
   height: number;
+  /** Height after subtracting safe-area insets (the usable layout height). */
+  usableHeight: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +134,12 @@ function getBreakpoint(width: number): Breakpoint {
   return 'largeDesktop';
 }
 
+function getHeightClass(usableHeight: number): HeightClass {
+  if (usableHeight < 700) return 'compact';
+  if (usableHeight < 800) return 'regular';
+  return 'expanded';
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -100,9 +148,9 @@ export function useResponsive(): ResponsiveValues {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
+  // ── Width breakpoint ──────────────────────────────────────────────────────
   const breakpoint = getBreakpoint(width);
 
-  // Backward-compatible boolean flags
   const isCompact = breakpoint === 'compactMobile';
   const isRegular = breakpoint === 'regularMobile';
   const isTablet = breakpoint === 'tablet';
@@ -111,20 +159,42 @@ export function useResponsive(): ResponsiveValues {
   const isLargeDesktop = breakpoint === 'largeDesktop';
   const isWideLayout = !isCompact && !isRegular;
 
-  // ── Spacing ──────────────────────────────────────────────────────────────
-  // Linearly interpolate from mobile anchors (390 px) to desktop anchors
-  // (1440 px).  This ensures spacing grows continuously instead of snapping.
+  // ── Usable height & height class ─────────────────────────────────────────
+  // Usable height excludes safe-area top/bottom so the height class reflects
+  // how much vertical space the layout can actually use.
+  const usableHeight = height - insets.top - insets.bottom;
+  const heightClass = getHeightClass(usableHeight);
+
+  const isCompactHeight  = heightClass === 'compact';
+  const isRegularHeight  = heightClass === 'regular';
+  const isExpandedHeight = heightClass === 'expanded';
+
+  // Continuous vertical scale: 0.85 at 600px usable, 1.0 at 750px, 1.2 at 900px.
+  const verticalScale = parseFloat(
+    Math.min(1.3, lerp(usableHeight, 600, 900, 0.85, 1.2)).toFixed(3)
+  );
+
+  // ── Vertical spacing ──────────────────────────────────────────────────────
+  // These values scale with verticalScale (not width) for height-sensitive gaps.
+  const vSpacing = {
+    xs: Math.round(lerp(verticalScale, 0.85, 1.2, 2,  6)),
+    sm: Math.round(lerp(verticalScale, 0.85, 1.2, 4,  12)),
+    md: Math.round(lerp(verticalScale, 0.85, 1.2, 8,  20)),
+    lg: Math.round(lerp(verticalScale, 0.85, 1.2, 14, 32)),
+    xl: Math.round(lerp(verticalScale, 0.85, 1.2, 20, 48)),
+  };
+
+  // ── Horizontal spacing ────────────────────────────────────────────────────
   const spacing = {
-    xs: Math.round(lerp(width, 390, 1440, 4, 10)),
-    sm: Math.round(lerp(width, 390, 1440, 8, 20)),
-    md: Math.round(lerp(width, 390, 1440, 16, 32)),
-    lg: Math.round(lerp(width, 390, 1440, 24, 48)),
-    xl: Math.round(lerp(width, 390, 1440, 32, 64)),
+    xs:  Math.round(lerp(width, 390, 1440, 4,  10)),
+    sm:  Math.round(lerp(width, 390, 1440, 8,  20)),
+    md:  Math.round(lerp(width, 390, 1440, 16, 32)),
+    lg:  Math.round(lerp(width, 390, 1440, 24, 48)),
+    xl:  Math.round(lerp(width, 390, 1440, 32, 64)),
     xxl: Math.round(lerp(width, 390, 1440, 48, 96)),
   };
 
-  // ── Font scale ───────────────────────────────────────────────────────────
-  // 1.0 at 390 px (mobile reference), 1.5 at 1536 px (large desktop cap)
+  // ── Font scale ────────────────────────────────────────────────────────────
   const fontScale = parseFloat(lerp(width, 390, 1536, 1.0, 1.5).toFixed(3));
 
   // ── Content max width ─────────────────────────────────────────────────────
@@ -132,11 +202,10 @@ export function useResponsive(): ResponsiveValues {
     isLargeDesktop ? 1400 :
     isDesktop      ? 1200 :
     isLaptop       ? 1000 :
-    isTablet       ? 800  :
-    /* mobile */     600;
+    isTablet       ?  800 :
+    /* mobile */      600;
 
-  // ── Tuner scale ───────────────────────────────────────────────────────────
-  // Drives TunerDisplay proportionally.
+  // ── Tuner scale (width-only) ──────────────────────────────────────────────
   // 0.85 at 320 px (compact mobile), 1.0 at 390 px, 1.8 at 1536 px, capped at 2.0.
   const tunerScale = parseFloat(
     Math.min(2.0, lerp(width, 320, 1536, 0.85, 1.8)).toFixed(3)
@@ -151,6 +220,12 @@ export function useResponsive(): ResponsiveValues {
     isDesktop,
     isLargeDesktop,
     isWideLayout,
+    heightClass,
+    isCompactHeight,
+    isRegularHeight,
+    isExpandedHeight,
+    verticalScale,
+    vSpacing,
     spacing,
     fontScale,
     contentMaxWidth,
@@ -158,5 +233,6 @@ export function useResponsive(): ResponsiveValues {
     insets,
     width,
     height,
+    usableHeight,
   };
 }

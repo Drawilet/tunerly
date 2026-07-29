@@ -27,8 +27,10 @@ function TunerScreen() {
     isWideLayout,
     contentMaxWidth,
     spacing,
-    tunerScale,
+    vSpacing,
+    isCompactHeight,
     height,
+    tunerScale,
   } = useResponsive();
 
   // Auto-start listening on screen mount
@@ -85,16 +87,21 @@ function TunerScreen() {
   }
 
   /**
-   * Tuner wrapper height budget:
-   * On web the flex container can grow to fill the full viewport height if
-   * there is surplus space.  Cap the tuner area so the instrument illustration
-   * and gauge do not become comically large on tall laptop/desktop displays.
-   * The cap is proportional to the tuner scale so it still grows on wider
-   * screens.
+   * Tuner wrapper height budget (web only):
+   * Cap the tuner area so the illustration and gauge do not become
+   * comically large on tall laptop/desktop displays.
    */
   const tunerMaxHeight = Platform.OS === 'web'
     ? Math.min(height * 0.65, 480 * tunerScale)
     : undefined;
+
+  /**
+   * Flex spacer between sections.
+   * On compact-height screens we give less flex to the spacers so the
+   * tuner area (which has flex: 1) wins the extra budget.
+   * On regular/expanded screens spacers grow comfortably.
+   */
+  const spacerFlex = isCompactHeight ? 0.3 : 0.5;
 
   return (
     <View
@@ -116,11 +123,21 @@ function TunerScreen() {
       />
 
       {/*
-        Inner content column:
-        - width: 100% up to contentMaxWidth
-        - Uses gap-based spacing instead of justifyContent: 'space-between'
-          so components don't spread unpredictably when viewport changes.
-        - On web, centered horizontally via alignSelf: 'center'.
+        Inner content column — uses flexible spacers rather than uniform gap.
+
+        Layout order (top → bottom):
+          [Header]
+          [Spacer — compresses first]
+          [Selectors Panel]
+          [Spacer — compresses first]
+          [Tuner Display — flex: 1, grows into available space]
+          [String Selector]
+          [Bottom padding — safe area]
+
+        The tuner wrapper has flex: 1 so it absorbs all remaining vertical
+        space after the header, selectors, and string row have been laid out.
+        Spacers have a small flex value so they yield to the tuner area on
+        short screens but provide breathing room on tall screens.
       */}
       <View
         style={{
@@ -129,12 +146,11 @@ function TunerScreen() {
           maxWidth: isWideLayout ? contentMaxWidth : '100%',
           alignSelf: 'center',
           alignItems: 'center',
-          gap: spacing.md,
-          paddingTop: spacing.sm,
-          paddingBottom: spacing.sm,
+          paddingTop: vSpacing.sm,
+          paddingBottom: vSpacing.sm,
         }}
       >
-        {/* Brand Header */}
+        {/* ── Brand Header ─────────────────────────────────────────────── */}
         <View style={[styles.header, { paddingHorizontal: spacing.sm }]}>
           <TouchableOpacity
             style={[styles.themeToggle, { borderColor: theme.border, backgroundColor: theme.card }]}
@@ -166,18 +182,27 @@ function TunerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Selectors Panel (Instrument + Tuning) */}
-        <View style={[styles.selectorsPanel, { gap: spacing.xs }]}>
+        {/* ── Spacer (breathes before selectors) ───────────────────────── */}
+        <View style={{ flex: spacerFlex, minHeight: vSpacing.xs, maxHeight: 24 }} />
+
+        {/* ── Selectors Panel (Instrument + Tuning) ────────────────────── */}
+        <View style={[styles.selectorsPanel, { gap: vSpacing.xs }]}>
           <InstrumentSelector />
           <TuningSelector />
         </View>
 
-        {/* Main Tuner Illustration & Gauge Dial */}
+        {/* ── Spacer (breathes before tuner) ───────────────────────────── */}
+        <View style={{ flex: spacerFlex, minHeight: vSpacing.xs, maxHeight: 24 }} />
+
+        {/* ── Main Tuner Display — grows to fill available space ────────── */}
         <View style={[styles.tunerWrapper, tunerMaxHeight ? { maxHeight: tunerMaxHeight } : {}]}>
           <TunerDisplay />
         </View>
 
-        {/* String Selection / Action Panel */}
+        {/* ── Small spacer above string selector ───────────────────────── */}
+        <View style={{ height: vSpacing.sm }} />
+
+        {/* ── String Selection Panel ────────────────────────────────────── */}
         <View style={styles.selectorWrapper}>
           <StringSelector />
         </View>
