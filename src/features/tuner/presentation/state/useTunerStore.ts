@@ -1,14 +1,14 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
+import { DetectedPitch } from '@/core/pitch/services/PitchProcessor';
 import { Platform } from 'react-native';
+import { create } from 'zustand';
+import { createJSONStorage, persist, StateStorage } from 'zustand/middleware';
 import {
+  GUITAR_STANDARD_TUNING,
   Instrument,
-  Tuning,
   StringNote,
   SUPPORTED_INSTRUMENTS,
-  GUITAR_STANDARD_TUNING,
+  Tuning,
 } from '../../domain/models/TunerModels';
-import { DetectedPitch } from '@/core/pitch/services/PitchProcessor';
 
 export interface DebugData {
   rms: number;
@@ -18,6 +18,12 @@ export interface DebugData {
   noiseFloor: number;
   currentThreshold: number;
   state: 'calibrating' | 'silence' | 'lowconfidence' | 'outofbounds' | 'unstable' | 'accepted';
+  currentGain: number;
+  agcState: string;
+  candidateFrequency: number;
+  candidateNote: string;
+  framesAboveThreshold: number;
+  framesBelowThreshold: number;
 }
 
 interface TunerState {
@@ -95,11 +101,11 @@ export const useTunerStore = create<TunerState>()(
       isRecording: false,
       microphonePermission: null,
       calibrationA4: 440,
-      amplitudeThreshold: 0.06, // Base fallback threshold (RMS)
+      amplitudeThreshold: 0.1, // Base fallback threshold (RMS)
 
       isCalibrating: false,
       noiseFloor: 0.0,
-      calibratedThreshold: 0.06,
+      calibratedThreshold: 0.1,
 
       themeMode: 'system',
       setThemeMode: (themeMode) => set({ themeMode }),
@@ -111,8 +117,14 @@ export const useTunerStore = create<TunerState>()(
         confidence: 0,
         stableFrames: 0,
         noiseFloor: 0,
-        currentThreshold: 0.06,
+        currentThreshold: 0.1,
         state: 'silence',
+        currentGain: 1.0,
+        agcState: 'nominal',
+        candidateFrequency: 0,
+        candidateNote: '--',
+        framesAboveThreshold: 0,
+        framesBelowThreshold: 0,
       },
 
       setInstrument: (activeInstrument) =>
@@ -166,7 +178,7 @@ export const useTunerStore = create<TunerState>()(
           isRecording: false,
           isCalibrating: false,
           noiseFloor: 0,
-          calibratedThreshold: 0.06,
+          calibratedThreshold: 0.1,
           themeMode: 'system',
         }),
     }),

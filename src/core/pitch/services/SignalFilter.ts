@@ -1,3 +1,34 @@
+export class DcBlocker {
+  private x1 = 0;
+  private y1 = 0;
+  private readonly R = 0.995;
+
+  public process(input: Float32Array): Float32Array {
+    const len = input.length;
+    const output = new Float32Array(len);
+    let x1 = this.x1;
+    let y1 = this.y1;
+    const R = this.R;
+
+    for (let i = 0; i < len; i++) {
+      const x = input[i];
+      const y = x - x1 + R * y1;
+      output[i] = y;
+      x1 = x;
+      y1 = y;
+    }
+
+    this.x1 = x1;
+    this.y1 = y1;
+    return output;
+  }
+
+  public reset(): void {
+    this.x1 = 0;
+    this.y1 = 0;
+  }
+}
+
 export class BiquadFilter {
   private b0 = 1;
   private b1 = 0;
@@ -62,6 +93,7 @@ export class BiquadFilter {
 }
 
 export class InstrumentBandpassFilter {
+  private dc = new DcBlocker();
   private hp = new BiquadFilter();
   private lp = new BiquadFilter();
   private lastInstrumentId: string | null = null;
@@ -96,17 +128,104 @@ export class InstrumentBandpassFilter {
     this.hp.setHighPass(lowCut, sampleRate);
     this.lp.setLowPass(highCut, sampleRate);
     
+    this.dc.reset();
     this.hp.reset();
     this.lp.reset();
   }
 
   public filter(buffer: Float32Array): Float32Array {
-    const highPassed = this.hp.process(buffer);
+    const dcBlocked = this.dc.process(buffer);
+    const highPassed = this.hp.process(dcBlocked);
     return this.lp.process(highPassed);
   }
 
   public reset(): void {
+    this.dc.reset();
     this.hp.reset();
     this.lp.reset();
+  }
+}
+
+export class AutomaticGainControl {
+  private gain = 1.0;
+  private currentEnvelope = 0.0;
+
+  // Configuration options
+  private targetLevel = 0.2;
+  private maxGain = 5.0;
+  private attackAlpha = 0.8;
+  private releaseAlpha = 0.02;
+
+  constructor(config: { targetLevel?: number; maxGain?: number; attackAlpha?: number; releaseAlpha?: number } = {}) {
+    if (config.targetLevel !== undefined) this.targetLevel = config.targetLevel;
+    if (config.maxGain !== undefined) this.maxGain = config.maxGain;
+    if (config.attackAlpha !== undefined) this.attackAlpha = config.attackAlpha;
+    if (config.releaseAlpha !== undefined) this.releaseAlpha = config.releaseAlpha;
+  }
+
+  public setParams(targetLevel: number, maxGain: number, attackAlpha: number, releaseAlpha: number): void {
+    this.targetLevel = targetLevel;
+    this.maxGain = maxGain;
+    this.attackAlpha = attackAlpha;
+    this.releaseAlpha = releaseAlpha;
+  }
+
+  public process(input: Float32Array, noiseFloor: number): Float32Array {
+    const len = input.length;
+    const output = new Float32Array(len);
+
+    // 1. Calculate envelope (RMS of current frame)
+    let sum = 0;
+    for (let i = 0; i < len; i++) {
+      sum += input[i] * input[i];
+    }
+    const rms = Math.sqrt(sum / Math.max(1, len));
+
+    // 2. Smooth the envelope
+    const envAlpha = 0.1;
+    this.currentEnvelope = (1 - envAlpha) * this.currentEnvelope + envAlpha * rms;
+
+    // 3. Determine target gain
+    let targetGain = 1.0;
+    
+    // Silence/noise floor gate — if envelope is too low, don't expand gain (slowly decay to 1.0)
+    const isSilence = this.currentEnvelope < noiseFloor * 1.5;
+
+    if (!isSilence && this.currentEnvelope > 0) {
+      targetGain = this.targetLevel / this.currentEnvelope;
+      if (targetGain > this.maxGain) {
+        targetGain = this.maxGain;
+      }
+      if (targetGain < 0.1) {
+        targetGain = 0.1;
+      }
+    } else {
+      targetGain = 1.0;
+    }
+
+    // 4. Adapt gain smoothly using attack/release coefficients
+    if (targetGain < this.gain) {
+      // Attack: fast reduction to prevent clipping
+      this.gain = this.attackAlpha * this.gain + (1 - this.attackAlpha) * targetGain;
+    } else {
+      // Release: slow increase to hold note levels
+      this.gain = this.releaseAlpha * this.gain + (1 - this.releaseAlpha) * targetGain;
+    }
+
+    // 5. Apply gain
+    for (let i = 0; i < len; i++) {
+      output[i] = input[i] * this.gain;
+    }
+
+    return output;
+  }
+
+  public getGain(): number {
+    return this.gain;
+  }
+
+  public reset(): void {
+    this.gain = 1.0;
+    this.currentEnvelope = 0.0;
   }
 }

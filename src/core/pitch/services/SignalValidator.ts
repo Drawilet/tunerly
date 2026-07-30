@@ -5,12 +5,18 @@ export interface SignalValidatorConfig {
   stabilityDeviationLimit: number;
   /** Consecutive frames the same chromatic note must appear to be accepted as locked. */
   debounceFrames: number;
+  /** Global lowest frequency accepted by the validator (Hz). */
+  minFrequency: number;
+  /** Global highest frequency accepted by the validator (Hz). */
+  maxFrequency: number;
 }
 
 const DEFAULT_CONFIG: SignalValidatorConfig = {
   stabilityHistorySize:    6,
   stabilityDeviationLimit: 0.02,
   debounceFrames:          4,
+  minFrequency:            20,
+  maxFrequency:            1500,
 };
 
 export class SignalValidator {
@@ -18,6 +24,8 @@ export class SignalValidator {
   private readonly maxHistory: number;
   private readonly stabilityThreshold: number;
   private readonly requiredStableFrames: number;
+  private readonly minFrequency: number;
+  private readonly maxFrequency: number;
 
   private candidateNoteId: string | null = null;
   private candidateCount = 0;
@@ -27,23 +35,15 @@ export class SignalValidator {
     this.maxHistory = cfg.stabilityHistorySize;
     this.stabilityThreshold = cfg.stabilityDeviationLimit;
     this.requiredStableFrames = cfg.debounceFrames;
+    this.minFrequency = cfg.minFrequency;
+    this.maxFrequency = cfg.maxFrequency;
   }
 
   /**
-   * Checks if the detected frequency is within the absolute boundaries of the selected instrument.
+   * Checks if the detected frequency is within the global validation bounds of the tuner.
    */
-  public isFrequencyInBounds(frequency: number, instrumentId: string): boolean {
-    switch (instrumentId) {
-      case 'bass':
-        return frequency >= 20 && frequency <= 450;
-      case 'ukulele':
-        return frequency >= 150 && frequency <= 1200;
-      case 'violin':
-        return frequency >= 150 && frequency <= 1500;
-      case 'guitar':
-      default:
-        return frequency >= 50 && frequency <= 1500;
-    }
+  public isFrequencyInBounds(frequency: number, _instrumentId?: string): boolean {
+    return frequency >= this.minFrequency && frequency <= this.maxFrequency;
   }
 
   /**

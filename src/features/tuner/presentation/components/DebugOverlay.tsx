@@ -10,7 +10,21 @@ export function DebugOverlay() {
 
   if (!showDebug) return null;
 
-  const { rms, frequency, confidence, stableFrames, noiseFloor, currentThreshold, state } = debugData;
+  const {
+    rms,
+    frequency,
+    confidence,
+    stableFrames,
+    noiseFloor,
+    currentThreshold,
+    state,
+    currentGain,
+    agcState,
+    candidateFrequency,
+    candidateNote,
+    framesAboveThreshold,
+    framesBelowThreshold,
+  } = debugData;
 
   const stateColors: Record<string, string> = {
     calibrating: '#FF9500', // Orange
@@ -31,20 +45,15 @@ export function DebugOverlay() {
         <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Signal RMS:</Text>
         <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{rms.toFixed(5)}</Text>
       </View>
-
+      
       <View style={styles.row}>
-        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Frequency:</Text>
-        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{frequency > 0 ? `${frequency.toFixed(2)} Hz` : '--'}</Text>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Current Gain:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{currentGain.toFixed(3)}</Text>
       </View>
 
       <View style={styles.row}>
-        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Confidence:</Text>
-        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{confidence.toFixed(3)}</Text>
-      </View>
-
-      <View style={styles.row}>
-        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Stable Frames:</Text>
-        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{stableFrames}</Text>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>AGC State:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{agcState.toUpperCase()}</Text>
       </View>
 
       <View style={styles.row}>
@@ -55,6 +64,41 @@ export function DebugOverlay() {
       <View style={styles.row}>
         <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Gate Threshold:</Text>
         <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{currentThreshold.toFixed(5)}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Frames Above:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{framesAboveThreshold}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Frames Below:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{framesBelowThreshold}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Pitch Confidence:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{confidence.toFixed(3)}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Stable Frames:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{stableFrames}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Candidate Freq:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{candidateFrequency > 0 ? `${candidateFrequency.toFixed(2)} Hz` : '--'}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Candidate Note:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{candidateNote}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Smoothed Freq:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{frequency > 0 ? `${frequency.toFixed(2)} Hz` : '--'}</Text>
       </View>
 
       <View style={styles.row}>
@@ -73,7 +117,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    width: 200,
+    width: 220,
     zIndex: 999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

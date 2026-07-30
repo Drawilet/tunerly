@@ -48,12 +48,13 @@ export class PitchProcessor {
     tuningNotes: StringNote[],
     selectedNote: StringNote | null,
     calibrationA4 = 440,
-    confidenceThreshold = 0.5
+    confidenceThreshold = 0.5,
+    minFrequency = 20,
+    maxFrequency = 1500
   ): DetectedPitch | null {
-    // 20Hz is flat E0/A0, 1500Hz is high F#6 with plenty of headroom.
     if (
-      frequency < 20 ||
-      frequency > 1500 ||
+      frequency < minFrequency ||
+      frequency > maxFrequency ||
       confidence < confidenceThreshold ||
       isNaN(frequency)
     ) {

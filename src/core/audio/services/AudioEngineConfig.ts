@@ -10,18 +10,10 @@ import { Platform } from 'react-native';
  * This allows per-platform tuning without touching business logic.
  */
 export interface AudioEngineConfig {
-  // ── Noise Gate ──────────────────────────────────────────────────────────
-  /**
-   * Base RMS threshold below which the signal is treated as silence.
-   * Mobile mics require a higher value because ambient noise RMS is higher
-   * relative to the signal floor than on desktop.
-   */
-  noiseGateBaseThreshold: number;
-
   // ── Noise Floor Calibration ──────────────────────────────────────────────
   /**
    * Duration in milliseconds over which the noise floor is sampled on startup.
-   * Longer calibration captures more variation in ambient noise on mobile.
+   * Longer calibration captures more variation in ambient noise.
    */
   calibrationDurationMs: number;
 
@@ -32,53 +24,45 @@ export interface AudioEngineConfig {
   calibrationMultiplier: number;
 
   /**
-   * Hard minimum for the calibrated threshold regardless of noise floor.
-   * Prevents the gate from being set too low even in very quiet rooms.
+   * Safety margin added to the noise floor threshold calculation.
+   * Helps avoid false-positives under completely silent conditions.
    */
-  calibrationMinimum: number;
+  safetyMargin: number;
 
   // ── Silence Timeout ──────────────────────────────────────────────────────
   /**
    * Milliseconds to wait after the last valid pitch before clearing the
    * display and resetting internal state.
-   * A longer timeout keeps the last detected note visible through normal
-   * note decay envelopes (prevents the display from flashing on mobile).
    */
   silenceTimeoutMs: number;
 
   // ── YIN Detector ─────────────────────────────────────────────────────────
   /**
    * YIN absolute threshold. Lower values require sharper periodicity for a
-   * detection to be accepted. Mobile benefits from a lower threshold to
-   * reject ambiguous low-SNR frames before they reach later filters.
+   * detection to be accepted.
    */
   yinThreshold: number;
 
   /**
-   * YIN fallback global-minimum threshold. If no local minimum below
-   * yinThreshold is found, YIN falls back to the frame's global minimum
-   * only if it is below this value. Tightening this on mobile reduces
-   * spurious detections on noisy frames.
+   * YIN fallback global-minimum threshold.
    */
   yinFallbackThreshold: number;
 
   // ── Confidence Gate ──────────────────────────────────────────────────────
   /**
    * Minimum YIN confidence score (0–1) required before a frequency is
-   * forwarded to the pitch processor. Higher = stricter.
+   * forwarded to the pitch processor.
    */
   confidenceThreshold: number;
 
   // ── Pitch Filter (Median + EMA) ───────────────────────────────────────────
   /**
    * Sliding window size for the median filter that eliminates outlier spikes.
-   * Larger window = more spike rejection, slightly more latency.
    */
   medianWindowSize: number;
 
   /**
    * EMA smoothing factor. Lower alpha = smoother needle but more sluggish.
-   * Mobile benefits from lower alpha to compensate for noisier YIN estimates.
    */
   emaAlpha: number;
 
@@ -109,96 +93,90 @@ export interface AudioEngineConfig {
   // ── Note Lock ────────────────────────────────────────────────────────────
   /**
    * Maximum deviation in cents from the locked note's frequency that is
-   * still considered "same note" for lock-maintenance purposes.
-   * 100 cents = 1 semitone. 75 cents allows for natural pitch wobble and
-   * minor mic noise without breaking the lock.
+   * still considered "same note".
    */
   noteLockCentsTolerance: number;
+
+  // ── Frequency Validation Bounds ───────────────────────────────────────────
+  /**
+   * Global lowest frequency (Hz) accepted by the tuner.
+   */
+  tunerMinFrequency: number;
+
+  /**
+   * Global highest frequency (Hz) accepted by the tuner.
+   */
+  tunerMaxFrequency: number;
+
+  // ── Automatic Gain Control (AGC) ─────────────────────────────────────────
+  /** Target normalized RMS level for the AGC output. */
+  agcTargetLevel: number;
+  /** Maximum gain factor allowed. */
+  agcMaxGain: number;
+  /** Smoothing factor for gain reduction (attack). */
+  agcAttackAlpha: number;
+  /** Smoothing factor for gain recovery (release). */
+  agcReleaseAlpha: number;
+
+  // ── Dynamic Noise Floor Tracking ─────────────────────────────────────────
+  /** Rate at which the estimated noise floor adapts to environment changes during idle. */
+  noiseFloorTrackingRate: number;
 }
 
 // ---------------------------------------------------------------------------
 // Per-platform presets
 // ---------------------------------------------------------------------------
 
-/**
- * Web / Desktop preset.
- * Desktop microphones are less sensitive to ambient noise; default thresholds
- * and filter parameters are appropriate.
- */
-const WEB_CONFIG: AudioEngineConfig = {
-  noiseGateBaseThreshold:  0.06,
-  calibrationDurationMs:   500,
+const BASE_CONFIG: Omit<AudioEngineConfig, 'emaAlpha' | 'debounceFrames' | 'medianWindowSize' | 'silenceTimeoutMs'> = {
+  calibrationDurationMs:   400,
   calibrationMultiplier:   3.0,
-  calibrationMinimum:      0.06,
-  silenceTimeoutMs:        300,
+  safetyMargin:            0.005,
+  confidenceThreshold:     0.45,
+  noteLockCentsTolerance:  75,
+  stabilityHistorySize:    6,
+  stabilityDeviationLimit: 0.02,
+  pitchResetThreshold:     0.08,
   yinThreshold:            0.15,
   yinFallbackThreshold:    0.40,
-  confidenceThreshold:     0.40,
-  medianWindowSize:        5,
+  tunerMinFrequency:       20,
+  tunerMaxFrequency:       1500,
+  agcTargetLevel:          0.20,
+  agcMaxGain:              5.0,
+  agcAttackAlpha:          0.80,
+  agcReleaseAlpha:         0.02,
+  noiseFloorTrackingRate:  0.02,
+};
+
+const WEB_CONFIG: AudioEngineConfig = {
+  ...BASE_CONFIG,
   emaAlpha:                0.15,
-  pitchResetThreshold:     0.08,
-  stabilityHistorySize:    6,
-  stabilityDeviationLimit: 0.02,
   debounceFrames:          4,
-  noteLockCentsTolerance:  75,
+  medianWindowSize:        5,
+  silenceTimeoutMs:        300,
 };
 
-/**
- * iOS preset.
- * iPhone microphones are high-quality but capture ambient noise more
- * aggressively than desktop mics. Higher gate, stricter confidence, longer
- * calibration and silence window.
- */
 const IOS_CONFIG: AudioEngineConfig = {
-  noiseGateBaseThreshold:  0.09,
-  calibrationDurationMs:   800,
-  calibrationMultiplier:   3.5,
-  calibrationMinimum:      0.10,
-  silenceTimeoutMs:        700,
-  yinThreshold:            0.12,
-  yinFallbackThreshold:    0.30,
+  ...BASE_CONFIG,
   confidenceThreshold:     0.50,
-  medianWindowSize:        7,
   emaAlpha:                0.10,
-  pitchResetThreshold:     0.06,
-  stabilityHistorySize:    6,
-  stabilityDeviationLimit: 0.02,
   debounceFrames:          5,
-  noteLockCentsTolerance:  75,
+  medianWindowSize:        7,
+  silenceTimeoutMs:        700,
 };
 
-/**
- * Android preset.
- * Android microphone characteristics vary widely by OEM. Using the same
- * conservative values as iOS provides a safe baseline; individual devices
- * can be further tuned by adjusting this preset.
- */
 const ANDROID_CONFIG: AudioEngineConfig = {
-  noiseGateBaseThreshold:  0.09,
-  calibrationDurationMs:   800,
-  calibrationMultiplier:   3.5,
-  calibrationMinimum:      0.10,
-  silenceTimeoutMs:        700,
-  yinThreshold:            0.12,
-  yinFallbackThreshold:    0.30,
+  ...BASE_CONFIG,
   confidenceThreshold:     0.50,
-  medianWindowSize:        7,
   emaAlpha:                0.10,
-  pitchResetThreshold:     0.06,
-  stabilityHistorySize:    6,
-  stabilityDeviationLimit: 0.02,
   debounceFrames:          5,
-  noteLockCentsTolerance:  75,
+  medianWindowSize:        7,
+  silenceTimeoutMs:        700,
 };
 
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
-/**
- * Returns the audio engine configuration preset for the current platform.
- * Call once at module initialization — result is stable for the app lifetime.
- */
 export function getAudioEngineConfig(): AudioEngineConfig {
   switch (Platform.OS) {
     case 'ios':
