@@ -108,11 +108,11 @@ export const useTunerStore = create<TunerState>()(
       isRecording: false,
       microphonePermission: null,
       calibrationA4: 440,
-      amplitudeThreshold: 0.1, // Base fallback threshold (RMS)
+      amplitudeThreshold: 0.06, // Base fallback threshold (RMS)
 
       isCalibrating: false,
       noiseFloor: 0.0,
-      calibratedThreshold: 0.1,
+      calibratedThreshold: 0.06,
 
       themeMode: 'system',
       setThemeMode: (themeMode) => set({ themeMode }),
@@ -124,7 +124,7 @@ export const useTunerStore = create<TunerState>()(
         confidence: 0,
         stableFrames: 0,
         noiseFloor: 0,
-        currentThreshold: 0.1,
+        currentThreshold: 0.06,
         state: 'silence',
         currentGain: 1.0,
         agcState: 'nominal',
@@ -192,7 +192,7 @@ export const useTunerStore = create<TunerState>()(
           isRecording: false,
           isCalibrating: false,
           noiseFloor: 0,
-          calibratedThreshold: 0.1,
+          calibratedThreshold: 0.06,
           themeMode: 'system',
         }),
     }),
