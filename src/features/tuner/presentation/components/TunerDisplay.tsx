@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import React, { useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, Text, Animated as RNAnimated, Easing } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -21,7 +21,14 @@ const TICK_COUNT = 11; // -50 to +50 in steps of 10
 // Component
 // ---------------------------------------------------------------------------
 
-export function TunerDisplay() {
+interface TunerDisplayProps {
+  /** Set when all strings are confirmed tuned — triggers a one-shot circle pulse. */
+  allComplete?: boolean;
+  /** Called by parent to register the per-string ripple trigger. */
+  onRegisterRippleTrigger?: (fn: () => void) => void;
+}
+
+export function TunerDisplay({ allComplete = false, onRegisterRippleTrigger }: TunerDisplayProps = {}) {
   const theme = useTheme();
   const currentPitch = useTunerStore((s) => s.currentPitch);
   const selectedNote = useTunerStore((s) => s.selectedNote);
@@ -54,6 +61,52 @@ export function TunerDisplay() {
 
   const centsShared = useSharedValue(0);
   const inTuneOpacity = useSharedValue(0);
+
+  // ── String-confirmation ripple ring (one-shot, core Animated) ────────────
+  // useMemo (not useRef) so these Animated.Values are plain variables during
+  // render, preventing the react-hooks/refs violation.
+   
+  const rippleScale   = React.useMemo(() => new RNAnimated.Value(1),  []);
+   
+  const rippleOpacity = React.useMemo(() => new RNAnimated.Value(0), []);
+
+  const triggerRipple = useCallback(() => {
+    rippleScale.setValue(1);
+    rippleOpacity.setValue(0.65);
+    RNAnimated.parallel([
+      RNAnimated.timing(rippleScale, {
+        toValue: 1.35,
+        duration: 420,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(rippleOpacity, {
+        toValue: 0,
+        duration: 420,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [rippleScale, rippleOpacity]);
+
+  // Register the trigger with the parent via the callback prop
+  useEffect(() => {
+    onRegisterRippleTrigger?.(triggerRipple);
+  }, [onRegisterRippleTrigger, triggerRipple]);
+
+  // ── All-complete ring pulse (one-shot, Reanimated) ────────────────────────
+  const completePulse = useSharedValue(1);
+  const prevAllComplete = useRef(false);
+  useEffect(() => {
+    if (allComplete && !prevAllComplete.current) {
+      prevAllComplete.current = true;
+      completePulse.value = withSpring(1.03, { damping: 8, stiffness: 120 }, () => {
+        completePulse.value = withSpring(1.0, { damping: 12, stiffness: 100 });
+      });
+    } else if (!allComplete) {
+      prevAllComplete.current = false;
+    }
+  }, [allComplete, completePulse]);
 
   // Update needle position and in-tune glow
   useEffect(() => {
@@ -107,6 +160,11 @@ export function TunerDisplay() {
       shadowOpacity,
     };
   });
+
+  // All-complete pulse on the ring wrapper
+  const ringPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: completePulse.value }],
+  }));
 
   // Animated style for the rotating indicator dot on the circular ring
   const indicatorRotationStyle = useAnimatedStyle(() => {
@@ -192,6 +250,24 @@ export function TunerDisplay() {
     <View style={styles.container}>
       {/* Upper Area: Circular Tuning Ring & Note Hero */}
       <View style={[styles.tuningRingWrapper, { height: ringWrapperH }]}>
+        {/* One-shot ripple ring — expands and fades on string confirmation */}
+        <RNAnimated.View
+          pointerEvents="none"
+          style={[
+            styles.rippleRing,
+            {
+              width: ringSize,
+              height: ringSize,
+              borderRadius: ringSize / 2,
+              borderColor: '#30D158',
+              opacity: rippleOpacity,
+              transform: [{ scale: rippleScale }],
+            },
+          ]}
+        />
+
+        {/* All-complete pulse wrapper */}
+        <Animated.View style={ringPulseStyle}>
         <Animated.View
           style={[
             styles.tuningRing,
@@ -263,6 +339,7 @@ export function TunerDisplay() {
               {frequencyText}
             </Text>
           </View>
+          </Animated.View>
         </Animated.View>
       </View>
 
@@ -361,7 +438,12 @@ const styles = StyleSheet.create({
   tuningRingWrapper: {
     justifyContent: 'center',
     alignItems: 'center',
-    height: 180,
+    position: 'relative',
+  },
+  rippleRing: {
+    position: 'absolute',
+    borderWidth: 1.5,
+    // backgroundColor is transparent — only the border is visible
   },
   tuningRing: {
     width: 160,

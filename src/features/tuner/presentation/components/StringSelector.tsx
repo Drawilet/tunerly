@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { View, StyleSheet, Text, TouchableOpacity, Animated, Easing } from 'react-native';
 import { useTunerStore } from '../state/useTunerStore';
 import { useTuner } from '../hooks/useTuner';
 import { StringNote } from '../../domain/models/TunerModels';
@@ -8,19 +8,240 @@ import { HapticsService } from '@/core/haptics/services/HapticsService';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 
-export function StringSelector() {
+// ── Per-peg animated state ─────────────────────────────────────────────────
+
+interface PegAnimState {
+  scale: Animated.Value;
+  checkOpacity: Animated.Value;
+  checkTranslate: Animated.Value;
+  borderColor: Animated.Value; // 0 = default, 1 = success
+  completed: boolean;
+}
+
+function createPegAnimState(): PegAnimState {
+  return {
+    scale: new Animated.Value(1),
+    checkOpacity: new Animated.Value(0),
+    checkTranslate: new Animated.Value(6),
+    borderColor: new Animated.Value(0),
+    completed: false,
+  };
+}
+
+// ── Individual animated peg ────────────────────────────────────────────────
+
+interface PegButtonProps {
+  note: StringNote;
+  isSelected: boolean;
+  isActive: boolean;
+  isCompleted: boolean;
+  pegSize: number;
+  pegFontSize: number;
+  octaveFontSize: number;
+  onPress: (note: StringNote) => void;
+  animState: PegAnimState;
+  theme: ReturnType<typeof import('../hooks/useTheme').useTheme>;
+}
+
+function PegButton({
+  note,
+  isSelected,
+  isActive,
+  isCompleted,
+  pegSize,
+  pegFontSize,
+  octaveFontSize,
+  onPress,
+  animState,
+  theme,
+}: PegButtonProps) {
+  const pegBorderRadius = pegSize / 2;
+
+  // Resolved colors
+  let buttonBg: string = theme.card;
+  let buttonBorder: string = theme.border;
+  let textColor: string = theme.textSecondary;
+  let octaveColor: string = theme.textTertiary;
+
+  if (isCompleted) {
+    // Completed: soft green background tint
+    buttonBg = theme.isDark ? 'rgba(48, 209, 88, 0.15)' : 'rgba(48, 209, 88, 0.12)';
+    buttonBorder = '#30D158';
+    textColor = '#30D158';
+    octaveColor = 'rgba(48, 209, 88, 0.7)';
+  } else if (isSelected) {
+    buttonBg = theme.accent;
+    buttonBorder = theme.accent;
+    textColor = '#FFFFFF';
+    octaveColor = 'rgba(255, 255, 255, 0.7)';
+  } else if (isActive) {
+    buttonBg = theme.isDark ? '#2C2C2E' : '#E5E5EA';
+    buttonBorder = theme.isDark ? '#3A3A3C' : '#D1D1D6';
+    textColor = theme.text;
+    octaveColor = theme.textSecondary;
+  }
+
+  const checkmarkSize = Math.max(12, Math.round(pegSize * 0.26));
+
+  return (
+    <View style={styles.pegWrapper}>
+      <Animated.View style={{ transform: [{ scale: animState.scale }] }}>
+        <TouchableOpacity
+          style={[
+            styles.pegButton,
+            {
+              width: pegSize,
+              height: pegSize,
+              borderRadius: pegBorderRadius,
+              backgroundColor: buttonBg,
+              borderColor: buttonBorder,
+            },
+          ]}
+          onPress={() => onPress(note)}
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[
+              styles.pegText,
+              {
+                color: textColor,
+                fontFamily:
+                  isSelected || isActive || isCompleted
+                    ? Fonts.semiBold
+                    : Fonts.regular,
+                fontSize: pegFontSize,
+              },
+            ]}
+          >
+            {note.name}
+          </Text>
+          <Text
+            style={[
+              styles.octaveText,
+              {
+                color: octaveColor,
+                fontSize: octaveFontSize,
+                fontFamily: Fonts.regular,
+              },
+            ]}
+          >
+            {note.octave}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Animated checkmark badge */}
+      <Animated.View
+        style={[
+          styles.checkmark,
+          {
+            opacity: animState.checkOpacity,
+            transform: [{ translateY: animState.checkTranslate }],
+            top: -checkmarkSize * 0.4,
+            right: -checkmarkSize * 0.4,
+            width: checkmarkSize,
+            height: checkmarkSize,
+            borderRadius: checkmarkSize / 2,
+            backgroundColor: '#30D158',
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <Text style={[styles.checkmarkText, { fontSize: checkmarkSize * 0.55 }]}>✓</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
+// ── Main StringSelector ────────────────────────────────────────────────────
+
+interface StringSelectorProps {
+  completedNoteIds?: Set<string>;
+  onStringAnimationStarted?: (noteId: string) => void;
+}
+
+export function StringSelector({
+  completedNoteIds = new Set(),
+  onStringAnimationStarted,
+}: StringSelectorProps) {
   const theme = useTheme();
-  const { activeInstrument, activeTuning, selectedNote, setSelectedNote, currentPitch, lastValidNote } = useTunerStore();
+  const { activeInstrument, activeTuning, selectedNote, setSelectedNote, currentPitch, lastValidNote } =
+    useTunerStore();
   const { triggerPluck } = useTuner();
   const { isCompact, isTablet, isDesktop } = useResponsive();
 
-  const pegSize = isCompact ? 40 : (isDesktop ? 72 : (isTablet ? 60 : 52));
-  const pegFontSize = isCompact ? 11 : (isDesktop ? 18 : (isTablet ? 16 : 14));
-  const octaveFontSize = isCompact ? 7 : (isDesktop ? 12 : (isTablet ? 11 : 9));
-  const pegBorderRadius = pegSize / 2;
+  const pegSize        = isCompact ? 40 : isDesktop ? 72 : isTablet ? 60 : 52;
+  const pegFontSize    = isCompact ? 11 : isDesktop ? 18 : isTablet ? 16 : 14;
+  const octaveFontSize = isCompact ? 7  : isDesktop ? 12 : isTablet ? 11 : 9;
 
-  // The active note being tuned (either manually selected, auto-detected, or the last valid note)
+  // One animated state object per note in the active tuning.
+  // useMemo (not useRef) so the map is a plain render variable, avoiding
+  // react-hooks/refs violations when accessed during render or inside .map().
+   
+  const animStates = React.useMemo<Map<string, PegAnimState>>(() => {
+    const map = new Map<string, PegAnimState>();
+    activeTuning.notes.forEach((note) => {
+      map.set(note.id, createPegAnimState());
+    });
+    return map;
+  // tuningId drives the memo reset — notes array reference changes every render
+  // but we only want to recreate animated values when the tuning actually changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTuning.id]);
+
+  // ── Completion animation trigger ─────────────────────────────────────
+  const triggerPegCompletion = useCallback((noteId: string) => {
+    const anim = animStates.get(noteId);
+    if (!anim || anim.completed) return;
+    anim.completed = true;
+
+    onStringAnimationStarted?.(noteId);
+
+    // Scale bounce: 0.95 → 1.05 → 1.0
+    Animated.sequence([
+      Animated.timing(anim.scale, {
+        toValue: 0.95,
+        duration: 60,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(anim.scale, {
+        toValue: 1.05,
+        duration: 130,
+        easing: Easing.out(Easing.back(1.5)),
+        useNativeDriver: true,
+      }),
+      Animated.timing(anim.scale, {
+        toValue: 1.0,
+        duration: 100,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Checkmark fade-in with upward slide
+    Animated.parallel([
+      Animated.timing(anim.checkOpacity, {
+        toValue: 1,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(anim.checkTranslate, {
+        toValue: 0,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  // animStates is stable per tuning — safe to include without stale closure
+   
+  }, [animStates, onStringAnimationStarted]);
+
+
+  // ── Interaction handlers ──────────────────────────────────────────────
   const activeNote = selectedNote ?? currentPitch?.targetNote ?? lastValidNote?.targetNote;
+  const tuningNotesList = activeTuning.notes.map((n) => n.name).join(' ');
 
   const handleNotePress = (note: StringNote) => {
     setSelectedNote(note);
@@ -33,19 +254,42 @@ export function StringSelector() {
     HapticsService.selection();
   };
 
-  // Build the list of note names for active tuning display string
-  const tuningNotesList = activeTuning.notes.map((n) => n.name).join(' ');
+  // ── Expose triggerPegCompletion via imperative handle ─────────────────
+  // Parent passes an `onStringAnimationStarted` ref-setter; we use a simpler
+  // approach: the parent drives completedNoteIds and we react in a useEffect.
+  const prevCompletedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    completedNoteIds.forEach((noteId) => {
+      if (!prevCompletedRef.current.has(noteId)) {
+        triggerPegCompletion(noteId);
+      }
+    });
+    prevCompletedRef.current = new Set(completedNoteIds);
+  }, [completedNoteIds, triggerPegCompletion]);
 
   return (
     <View style={styles.container}>
       {/* Active Tuning Detail Label */}
       <View style={styles.header}>
-        <Text style={[styles.tuningLabel, { color: theme.textSecondary, fontSize: isCompact ? 10 : (isDesktop ? 18 : (isTablet ? 15 : 12)) }]}>
+        <Text
+          style={[
+            styles.tuningLabel,
+            {
+              color: theme.textSecondary,
+              fontSize: isCompact ? 10 : isDesktop ? 18 : isTablet ? 15 : 12,
+            },
+          ]}
+        >
           {activeInstrument.name} • {activeTuning.name} ({tuningNotesList})
         </Text>
       </View>
 
-      <View style={[styles.selectorRow, { gap: isCompact ? 6 : (isDesktop ? 18 : (isTablet ? 12 : 10)) }]}>
+      <View
+        style={[
+          styles.selectorRow,
+          { gap: isCompact ? 6 : isDesktop ? 18 : isTablet ? 12 : 10 },
+        ]}
+      >
         {/* Auto Detection Toggle Peg */}
         <TouchableOpacity
           style={[
@@ -53,7 +297,7 @@ export function StringSelector() {
             {
               width: pegSize,
               height: pegSize,
-              borderRadius: pegBorderRadius,
+              borderRadius: pegSize / 2,
               backgroundColor: !selectedNote ? theme.accent : theme.card,
               borderColor: !selectedNote ? theme.accent : theme.border,
             },
@@ -75,70 +319,27 @@ export function StringSelector() {
           </Text>
         </TouchableOpacity>
 
-        {/* Individual Strings */}
+        {/* Individual String Pegs */}
         {activeTuning.notes.map((note) => {
-          const isSelected = selectedNote?.id === note.id;
-          const isActive = activeNote?.id === note.id;
-
-          // Background styling for native iOS buttons
-          let buttonBg: string = theme.card;
-          let buttonBorder: string = theme.border;
-          let textColor: string = theme.textSecondary;
-          let octaveColor: string = theme.textTertiary;
-
-          if (isSelected) {
-            buttonBg = theme.accent;
-            buttonBorder = theme.accent;
-            textColor = '#FFFFFF';
-            octaveColor = 'rgba(255, 255, 255, 0.7)';
-          } else if (isActive) {
-            buttonBg = theme.isDark ? '#2C2C2E' : '#E5E5EA';
-            buttonBorder = theme.isDark ? '#3A3A3C' : '#D1D1D6';
-            textColor = theme.text;
-            octaveColor = theme.textSecondary;
-          }
+          const isSelected  = selectedNote?.id === note.id;
+          const isActive    = activeNote?.id === note.id;
+          const isCompleted = completedNoteIds.has(note.id);
+          const animState   = animStates.get(note.id) ?? createPegAnimState();
 
           return (
-            <TouchableOpacity
+            <PegButton
               key={note.id}
-              style={[
-                styles.pegButton,
-                {
-                  width: pegSize,
-                  height: pegSize,
-                  borderRadius: pegBorderRadius,
-                  backgroundColor: buttonBg,
-                  borderColor: buttonBorder,
-                },
-              ]}
-              onPress={() => handleNotePress(note)}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.pegText,
-                  {
-                    color: textColor,
-                    fontFamily: isSelected || isActive ? Fonts.semiBold : Fonts.regular,
-                    fontSize: pegFontSize,
-                  },
-                ]}
-              >
-                {note.name}
-              </Text>
-              <Text
-                style={[
-                  styles.octaveText,
-                  {
-                    color: octaveColor,
-                    fontSize: octaveFontSize,
-                    fontFamily: Fonts.regular,
-                  },
-                ]}
-              >
-                {note.octave}
-              </Text>
-            </TouchableOpacity>
+              note={note}
+              isSelected={isSelected}
+              isActive={isActive}
+              isCompleted={isCompleted}
+              pegSize={pegSize}
+              pegFontSize={pegFontSize}
+              octaveFontSize={octaveFontSize}
+              onPress={handleNotePress}
+              animState={animState}
+              theme={theme}
+            />
           );
         })}
       </View>
@@ -170,6 +371,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingHorizontal: 16,
   },
+  pegWrapper: {
+    position: 'relative',
+  },
   pegButton: {
     borderWidth: 0.5,
     alignItems: 'center',
@@ -180,5 +384,20 @@ const styles = StyleSheet.create({
   },
   octaveText: {
     marginTop: 0.5,
+  },
+  checkmark: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#30D158',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  checkmarkText: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.semiBold,
+    lineHeight: undefined,
   },
 });

@@ -15,12 +15,25 @@ export class HapticsService {
   }
 
   /**
-   * Triggers success feedback (e.g. when string is in perfect tune).
+   * Triggers success feedback (e.g. when all strings are perfectly tuned).
    */
   static async notificationSuccess() {
     if (Platform.OS === 'web') return;
     try {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      // Graceful fallback
+    }
+  }
+
+  /**
+   * Triggers a soft impact tap — used for individual string completion confirmation.
+   * Lighter than impactLight(), approximately 10–20 ms perceived duration.
+   */
+  static async impactSoft() {
+    if (Platform.OS === 'web') return;
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
     } catch {
       // Graceful fallback
     }

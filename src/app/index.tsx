@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { StyleSheet, View, StatusBar, TouchableOpacity } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTuner } from '@/features/tuner/presentation/hooks/useTuner';
@@ -8,7 +8,9 @@ import { StringSelector } from '@/features/tuner/presentation/components/StringS
 import { InstrumentSelector } from '@/features/tuner/presentation/components/InstrumentSelector';
 import { TuningSelector } from '@/features/tuner/presentation/components/TuningSelector';
 import { PermissionGate } from '@/features/tuner/presentation/components/PermissionGate';
+import { CompletionOverlay } from '@/features/tuner/presentation/components/CompletionOverlay';
 import { useTheme } from '@/features/tuner/presentation/hooks/useTheme';
+import { useTuningProgress } from '@/features/tuner/presentation/hooks/useTuningProgress';
 import { Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { DebugOverlay } from '@/features/tuner/presentation/components/DebugOverlay';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -28,7 +30,36 @@ function TunerScreen() {
     isDesktop,
     contentMaxWidth,
     spacing,
+    width,
   } = useResponsive();
+
+  // ── Completion progress ────────────────────────────────────────────────
+  const { completedNoteIds, allComplete, onStringCompleteRef, onAllCompleteRef } =
+    useTuningProgress();
+
+  // Track whether the confetti overlay is currently visible
+  const [showCompletion, setShowCompletion] = useState(false);
+
+  // Ref to the TunerDisplay ripple trigger (registered via prop callback)
+  const rippleTriggerRef = useRef<(() => void) | null>(null);
+
+  const handleRegisterRipple = useCallback((fn: () => void) => {
+    rippleTriggerRef.current = fn;
+  }, []);
+
+  // Wire the per-string callback: fire ripple on the TunerDisplay ring
+  useEffect(() => {
+    onStringCompleteRef.current = (_noteId: string) => {
+      rippleTriggerRef.current?.();
+    };
+  }, [onStringCompleteRef]);
+
+  // Wire the all-complete callback: show the celebration overlay
+  useEffect(() => {
+    onAllCompleteRef.current = () => {
+      setShowCompletion(true);
+    };
+  }, [onAllCompleteRef]);
 
   // Auto-start listening on screen mount
   useEffect(() => {
@@ -148,14 +179,24 @@ function TunerScreen() {
 
         {/* Main Tuner Display — grows to fill available space */}
         <View style={styles.tunerWrapper}>
-          <TunerDisplay />
+          <TunerDisplay
+            allComplete={allComplete}
+            onRegisterRippleTrigger={handleRegisterRipple}
+          />
         </View>
 
         {/* String Selection Panel */}
         <View style={styles.selectorWrapper}>
-          <StringSelector />
+          <StringSelector completedNoteIds={completedNoteIds} />
         </View>
       </View>
+
+      {/* Completion overlay — confetti + success message when all strings tuned */}
+      <CompletionOverlay
+        visible={showCompletion}
+        screenWidth={width}
+        onDismiss={() => setShowCompletion(false)}
+      />
 
       {/*
         Permission gate renders as a full-screen overlay on top of the already-
