@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { DetectedPitch } from '@/core/pitch/services/PitchProcessor';
 import { Platform } from 'react-native';
 import { create } from 'zustand';
@@ -204,3 +205,50 @@ export const useTunerStore = create<TunerState>()(
     }
   )
 );
+
+/**
+ * useStoreHydrated
+ *
+ * Returns `true` once Zustand's persist middleware has finished reading the
+ * persisted store state from storage (localStorage on web, in-memory on native).
+ *
+ * Use this to block rendering until the correct `themeMode` is available,
+ * preventing the race condition where components render before the persisted
+ * preference is applied.
+ *
+ * Implementation uses Zustand's official `onFinishHydration` API which fires
+ * synchronously after the storage `getItem` resolves.
+ */
+export function useStoreHydrated(): boolean {
+  // On native the in-memory storage is synchronous — the store is always
+  // hydrated before any component mounts. Start as `true` on native.
+  const [hydrated, setHydrated] = useState<boolean>(
+    Platform.OS !== 'web' || useTunerStore.persist.hasHydrated()
+  );
+
+  useEffect(() => {
+    // If already hydrated (e.g. native or fast synchronous storage) do nothing.
+    if (hydrated) return;
+
+    // Subscribe to the finish-hydration event.
+    // setState is called inside a Zustand event-listener callback, not directly
+    // in the effect body — this is the correct pattern for external subscriptions.
+    const unsub = useTunerStore.persist.onFinishHydration(() => {
+       
+      setHydrated(true);
+    });
+
+    // Re-check in case hydration completed between the useState init and this
+    // effect running (micro-task race on web).
+    if (useTunerStore.persist.hasHydrated()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHydrated(true);
+    }
+
+    return unsub;
+  // Only run once on mount — hydration is a one-shot event.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return hydrated;
+}
