@@ -4,6 +4,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withSequence,
   interpolate,
   Extrapolation,
   withTiming,
@@ -100,9 +101,12 @@ export function TunerDisplay({ allComplete = false, onRegisterRippleTrigger }: T
   useEffect(() => {
     if (allComplete && !prevAllComplete.current) {
       prevAllComplete.current = true;
-      completePulse.value = withSpring(1.03, { damping: 8, stiffness: 120 }, () => {
-        completePulse.value = withSpring(1.0, { damping: 12, stiffness: 100 });
-      });
+      // withSequence chains the two springs without callbacks, avoiding
+      // the "Maximum call stack size exceeded" error from nested worklets.
+      completePulse.value = withSequence(
+        withSpring(1.03, { damping: 8, stiffness: 120 }),
+        withSpring(1.0,  { damping: 12, stiffness: 100 })
+      );
     } else if (!allComplete) {
       prevAllComplete.current = false;
     }
