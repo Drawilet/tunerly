@@ -138,6 +138,9 @@ export function useTuner() {
     // Synchronize current threshold to noise gate
     noiseGate.current.setThreshold(currentThreshold);
 
+    // Fetch hardware audio diagnostics info
+    const diagnostics = recorder.current.getDiagnostics();
+
     // Track consecutive frames above/below gate threshold
     if (agcRms >= currentThreshold) {
       framesAboveThresholdRef.current++;
@@ -188,6 +191,7 @@ export function useTuner() {
         candidateNote: '--',
         framesAboveThreshold: framesAboveThresholdRef.current,
         framesBelowThreshold: framesBelowThresholdRef.current,
+        ...diagnostics,
       });
       return;
     }
@@ -275,6 +279,7 @@ export function useTuner() {
         candidateNote: '--',
         framesAboveThreshold: framesAboveThresholdRef.current,
         framesBelowThreshold: framesBelowThresholdRef.current,
+        ...diagnostics,
       });
       return;
     }
@@ -333,6 +338,7 @@ export function useTuner() {
         candidateNote,
         framesAboveThreshold: framesAboveThresholdRef.current,
         framesBelowThreshold: framesBelowThresholdRef.current,
+        ...diagnostics,
       });
       return;
     }
@@ -364,6 +370,7 @@ export function useTuner() {
         candidateNote,
         framesAboveThreshold: framesAboveThresholdRef.current,
         framesBelowThreshold: framesBelowThresholdRef.current,
+        ...diagnostics,
       });
       return;
     }
@@ -391,6 +398,7 @@ export function useTuner() {
         candidateNote,
         framesAboveThreshold: framesAboveThresholdRef.current,
         framesBelowThreshold: framesBelowThresholdRef.current,
+        ...diagnostics,
       });
       return;
     }
@@ -475,6 +483,7 @@ export function useTuner() {
         candidateNote,
         framesAboveThreshold: framesAboveThresholdRef.current,
         framesBelowThreshold: framesBelowThresholdRef.current,
+        ...diagnostics,
       });
     } else {
       // Frequency jumped outside the lock tolerance — treat as note change
@@ -500,6 +509,7 @@ export function useTuner() {
         candidateNote,
         framesAboveThreshold: framesAboveThresholdRef.current,
         framesBelowThreshold: framesBelowThresholdRef.current,
+        ...diagnostics,
       });
     }
   }, [setCurrentPitch, setNoiseFloor, setIsCalibrating, setDebugData]);

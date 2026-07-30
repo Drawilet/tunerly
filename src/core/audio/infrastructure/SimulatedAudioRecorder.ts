@@ -1,4 +1,4 @@
-import { IAudioRecorder, AudioRecorderState } from '../domain/IAudioRecorder';
+import { IAudioRecorder, AudioRecorderState, AudioDiagnostics } from '../domain/IAudioRecorder';
 
 export class SimulatedAudioRecorder implements IAudioRecorder {
   private state: AudioRecorderState = {
@@ -126,6 +126,18 @@ export class SimulatedAudioRecorder implements IAudioRecorder {
     callback(this.getState());
     return () => {
       this.listeners.delete(callback);
+    };
+  }
+
+  getDiagnostics(): AudioDiagnostics {
+    return {
+      activeAudioSessionMode: 'Simulated',
+      activeSampleRate: this.sampleRate,
+      bufferSize: 4096,
+      inputChannelCount: 1,
+      audioSource: 'Simulated',
+      audioSessionCategoryMode: 'Simulated',
+      systemVoiceProcessingActive: 'inactive',
     };
   }
 

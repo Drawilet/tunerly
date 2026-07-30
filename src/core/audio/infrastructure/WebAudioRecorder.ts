@@ -1,4 +1,4 @@
-import { IAudioRecorder, AudioRecorderState } from '../domain/IAudioRecorder';
+import { IAudioRecorder, AudioRecorderState, AudioDiagnostics } from '../domain/IAudioRecorder';
 
 export class WebAudioRecorder implements IAudioRecorder {
   get sampleRate(): number {
@@ -64,20 +64,42 @@ export class WebAudioRecorder implements IAudioRecorder {
         throw new Error('Microphone permission not granted');
       }
 
+      // Set iOS Safari Audio Session category to play-and-record
+      if (typeof navigator !== 'undefined' && 'audioSession' in navigator) {
+        try {
+          (navigator as any).audioSession.type = 'play-and-record';
+        } catch (e) {
+          console.warn('Failed to set audio session type:', e);
+        }
+      }
+
       // Initialize AudioContext
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioContextClass({
         latencyHint: 'interactive',
+        sampleRate: 44100, // Explicitly request full 44.1 kHz sample rate
       });
 
-      // Get audio stream without filtering so pitch detection is more accurate
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      // Get audio stream without speech communication optimizations
+      const constraints: any = {
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
-        },
-      });
+          sampleRate: 44100,
+          channelCount: 1,
+          // Android Chrome / WebRTC legacy parameters to disable voice processing
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          googEchoCancellation2: false,
+          googAutoGainControl2: false,
+          googNoiseSuppression2: false,
+        }
+      };
+
+      this.stream = await navigator.mediaDevices.getUserMedia(constraints);
 
       const source = this.audioContext.createMediaStreamSource(this.stream);
       this.analyser = this.audioContext.createAnalyser();
@@ -161,8 +183,52 @@ export class WebAudioRecorder implements IAudioRecorder {
       this.audioContext = null;
     }
 
+    if (typeof navigator !== 'undefined' && 'audioSession' in navigator) {
+      try {
+        (navigator as any).audioSession.type = 'playback';
+      } catch (e) {
+        console.warn('Failed to restore audio session type:', e);
+      }
+    }
+
     this.analyser = null;
     this.updateState({ isRecording: false });
+  }
+
+  getDiagnostics(): AudioDiagnostics {
+    const track = this.stream?.getAudioTracks()[0];
+    const settings = track?.getSettings() || {};
+    
+    // Inferred information
+    const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+    const isAndroid = typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent);
+
+    let audioSessionCategory = 'N/A';
+    let audioSessionMode = 'N/A';
+    if (isIOS) {
+      audioSessionCategory = (typeof navigator !== 'undefined' && 'audioSession' in navigator) ? ((navigator as any).audioSession.type || 'play-and-record') : 'play-and-record (default)';
+      audioSessionMode = 'default';
+    }
+
+    let audioSource = 'N/A';
+    if (isAndroid) {
+      audioSource = 'default/microphone';
+    }
+
+    const isVoiceProcessingActive =
+      settings.echoCancellation === true ||
+      settings.noiseSuppression === true ||
+      settings.autoGainControl === true;
+
+    return {
+      activeAudioSessionMode: isIOS ? audioSessionMode : 'N/A',
+      activeSampleRate: this.sampleRate,
+      bufferSize: this.analyser?.fftSize ?? 4096,
+      inputChannelCount: settings.channelCount ?? 1,
+      audioSource: isAndroid ? audioSource : 'N/A',
+      audioSessionCategoryMode: isIOS ? `${audioSessionCategory} / ${audioSessionMode}` : 'N/A',
+      systemVoiceProcessingActive: isVoiceProcessingActive ? 'active' : 'inactive',
+    };
   }
 
   getState(): AudioRecorderState {

@@ -4,6 +4,16 @@ export interface AudioRecorderState {
   error: string | null;
 }
 
+export interface AudioDiagnostics {
+  activeAudioSessionMode: string;
+  activeSampleRate: number;
+  bufferSize: number;
+  inputChannelCount: number;
+  audioSource: string;
+  audioSessionCategoryMode: string;
+  systemVoiceProcessingActive: string;
+}
+
 export interface IAudioRecorder {
   readonly sampleRate: number;
 
@@ -34,4 +44,9 @@ export interface IAudioRecorder {
    * Returns an unsubscribe function.
    */
   subscribeToState(callback: (state: AudioRecorderState) => void): () => void;
+
+  /**
+   * Expose device audio configuration for diagnostics.
+   */
+  getDiagnostics(): AudioDiagnostics;
 }

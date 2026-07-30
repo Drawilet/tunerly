@@ -24,6 +24,13 @@ export function DebugOverlay() {
     candidateNote,
     framesAboveThreshold,
     framesBelowThreshold,
+    activeAudioSessionMode,
+    activeSampleRate,
+    bufferSize,
+    inputChannelCount,
+    audioSource,
+    audioSessionCategoryMode,
+    systemVoiceProcessingActive,
   } = debugData;
 
   const stateColors: Record<string, string> = {
@@ -105,6 +112,41 @@ export function DebugOverlay() {
         <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Pipeline State:</Text>
         <Text style={[styles.value, { color: stateColor, fontFamily: Fonts.bold, fontSize: 10 }]}>{state.toUpperCase()}</Text>
       </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Sample Rate:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{activeSampleRate} Hz</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Buffer Size:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{bufferSize}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Channels:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{inputChannelCount}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Audio Source:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{audioSource}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Session Mode:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{activeAudioSessionMode}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Audio Cat/Mode:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono, fontSize: 8 }]}>{audioSessionCategoryMode}</Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={[styles.label, { color: theme.textSecondary, fontFamily: Fonts.regular }]}>Voice Processing:</Text>
+        <Text style={[styles.value, { color: theme.text, fontFamily: Fonts.mono }]}>{systemVoiceProcessingActive.toUpperCase()}</Text>
+      </View>
     </View>
   );
 }
@@ -117,7 +159,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    width: 220,
+    width: 240,
     zIndex: 999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

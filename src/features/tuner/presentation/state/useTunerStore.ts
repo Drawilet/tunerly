@@ -24,6 +24,13 @@ export interface DebugData {
   candidateNote: string;
   framesAboveThreshold: number;
   framesBelowThreshold: number;
+  activeAudioSessionMode: string;
+  activeSampleRate: number;
+  bufferSize: number;
+  inputChannelCount: number;
+  audioSource: string;
+  audioSessionCategoryMode: string;
+  systemVoiceProcessingActive: string;
 }
 
 interface TunerState {
@@ -125,6 +132,13 @@ export const useTunerStore = create<TunerState>()(
         candidateNote: '--',
         framesAboveThreshold: 0,
         framesBelowThreshold: 0,
+        activeAudioSessionMode: '--',
+        activeSampleRate: 0,
+        bufferSize: 0,
+        inputChannelCount: 0,
+        audioSource: '--',
+        audioSessionCategoryMode: '--',
+        systemVoiceProcessingActive: '--',
       },
 
       setInstrument: (activeInstrument) =>
