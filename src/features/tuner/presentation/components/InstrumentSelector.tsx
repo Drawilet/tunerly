@@ -15,13 +15,13 @@ import { useResponsive } from '@/hooks/useResponsive';
 export function InstrumentSelector() {
   const theme = useTheme();
   const { activeInstrument, setInstrument } = useTunerStore();
-  const { tunerScale, isWideLayout } = useResponsive();
+  const { isCompact, isTablet, isDesktop } = useResponsive();
 
   // Use percentage width with a maxWidth cap instead of re-subtracting parent padding.
   // The parent already applies horizontal padding; this avoids double-subtraction.
-  const containerMaxWidth = isWideLayout ? 600 : 380;
-  const containerHeight = Math.round(64 * Math.min(1.25, tunerScale));
-  const tabLabelFontSize = Math.round(11 * Math.min(1.3, tunerScale));
+  const containerMaxWidth = (isTablet || isDesktop) ? 600 : 380;
+  const containerHeight = isDesktop ? 76 : (isTablet ? 70 : 64);
+  const tabLabelFontSize = isCompact ? 10 : (isDesktop ? 14 : (isTablet ? 12 : 11));
   // tabWidth is computed dynamically inside render via onLayout; use '25%' flex instead.
   const tabFlex = 1;
 
@@ -54,7 +54,7 @@ export function InstrumentSelector() {
   // Render a minimal geometric representation icon for each instrument type
   const renderInstrumentIcon = (id: string, isSelected: boolean) => {
     const iconColor = isSelected ? theme.accent : theme.textTertiary;
-    const iconScale = Math.min(1.5, tunerScale);
+    const iconScale = isDesktop ? 1.35 : (isTablet ? 1.15 : 1.0);
 
     const getIcon = () => {
       switch (id) {

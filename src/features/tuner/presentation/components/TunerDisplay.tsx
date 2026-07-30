@@ -18,25 +18,6 @@ import { useResponsive } from '@/hooks/useResponsive';
 const TICK_COUNT = 11; // -50 to +50 in steps of 10
 
 // ---------------------------------------------------------------------------
-// Scale helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Compute a dimension proportional to the continuous tunerScale, anchored at
- * a reference value (the size at 1.0 scale / standard 390 px mobile width).
- * Applies an independent min/max cap per-dimension so critical controls
- * (e.g. the ring) never shrink below usability or grow beyond aesthetics.
- */
-function scaleDim(
-  ref: number,
-  tunerScale: number,
-  min: number,
-  max: number
-): number {
-  return Math.min(max, Math.max(min, Math.round(ref * tunerScale)));
-}
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -48,53 +29,28 @@ export function TunerDisplay() {
   const isCalibrating = useTunerStore((s) => s.isCalibrating);
   const lastValidNote = useTunerStore((s) => s.lastValidNote);
 
-  const { tunerScale, vSpacing, width, isWideLayout, isCompactHeight, isRegularHeight } = useResponsive();
+  const { isCompact, isTablet, isDesktop, width, spacing, insets } = useResponsive();
 
-  // ── Width-based proportional dimensions ──────────────────────────────────
-  // These all track tunerScale (width-only) so the ring/note/gauge maintain
-  // their visual weight regardless of screen height.
-  const ringSize         = scaleDim(160, tunerScale, 100, 280);
-  const ringWrapperH     = scaleDim(180, tunerScale, 120, 310);
-  const noteFontSize     = scaleDim(56,  tunerScale, 36,  100);
-  const octaveFontSize   = scaleDim(18,  tunerScale, 12,  32);
-  const instrumentFontSz = scaleDim(9,   tunerScale, 7,   16);
-  const frequencyFontSz  = scaleDim(12,  tunerScale, 9,   20);
-  const centsFontSz      = scaleDim(13,  tunerScale, 10,  22);
-  const scaleLabelFontSz = scaleDim(11,  tunerScale, 9,   18);
-  const dotSize          = scaleDim(10,  tunerScale, 6,   18);
-  const borderWidth      = tunerScale > 1.4 ? 2.5 : 1.5;
-  const needleW          = tunerScale > 1.4 ? 2.5 : 1.5;
-  const needleH          = scaleDim(32,  tunerScale, 20,  56);
-  const needleTop        = scaleDim(-12, tunerScale, -8,  -20);
+  // ── Proportionally-scaled dimensions ─────────────────────────────────────
+  // Each dimension has its own min/max so components adapt independently.
+  const ringSize         = isCompact ? 120 : (isDesktop ? 220 : (isTablet ? 185 : 160));
+  const ringWrapperH     = isCompact ? 130 : (isDesktop ? 240 : (isTablet ? 200 : 180));
+  const noteFontSize     = isCompact ? 40 : (isDesktop ? 80 : (isTablet ? 64 : 56));
+  const octaveFontSize   = isCompact ? 14 : (isDesktop ? 26 : (isTablet ? 22 : 18));
+  const instrumentFontSz = isCompact ? 8 : (isDesktop ? 13 : (isTablet ? 11 : 9));
+  const frequencyFontSz  = isCompact ? 10 : (isDesktop ? 16 : 12);
+  const centsFontSz      = isCompact ? 11 : (isDesktop ? 18 : (isTablet ? 15 : 13));
+  const scaleLabelFontSz = isCompact ? 9 : (isDesktop ? 15 : (isTablet ? 13 : 11));
+  const illustrationH    = isCompact ? 100 : (isDesktop ? 240 : (isTablet ? 200 : 160));
+  const dotSize          = isCompact ? 8 : (isDesktop ? 14 : 10);
+  const borderWidth      = isDesktop ? 2.5 : 1.5;
+  const needleW          = isDesktop ? 2.5 : 1.5;
+  const needleH          = isDesktop ? 44 : 32;
+  const needleTop        = isDesktop ? -18 : -12;
 
-  // ── Height-based illustration sizing ─────────────────────────────────────
-  // The instrument headstock illustration is the FIRST element to sacrifice
-  // vertical space on short screens.  Ring, gauge, and controls are untouched.
-  //
-  //  compact  (<700 px usable) → illustration hidden entirely
-  //  regular  (700-799 px)     → reduced to 60 px
-  //  expanded (≥800 px)        → full size driven by tunerScale
-  const illustrationH = isCompactHeight
-    ? 0
-    : isRegularHeight
-      ? 60
-      : scaleDim(160, tunerScale, 80, 280);
-  const showIllustration = illustrationH > 0;
+  const SCALE_WIDTH = Math.min(width - spacing.md * 2 - insets.left - insets.right, isDesktop ? 600 : (isTablet ? 450 : 360));
 
-  /**
-   * SCALE_WIDTH: the gauge card width.
-   *
-   * Previously computed as: Math.min(width - spacing.md * 2, capByBreakpoint)
-   * This double-subtracted padding (the parent already applies horizontal
-   * padding, so `width` already represents available content width).
-   *
-   * New approach: take a percentage of the available width, capped per
-   * breakpoint.  The percentage-based value avoids re-subtracting padding.
-   */
-  const gaugeMaxWidth = isWideLayout ? 600 : 360;
-  const SCALE_WIDTH = Math.min(width * 0.88, gaugeMaxWidth);
-
-  const illustrationScale = tunerScale;
+  const illustrationScale = isCompact ? 0.65 : (isDesktop ? 1.4 : (isTablet ? 1.15 : 1.0));
 
   const centsShared = useSharedValue(0);
   const inTuneOpacity = useSharedValue(0);
@@ -233,7 +189,7 @@ export function TunerDisplay() {
   };
 
   return (
-    <View style={[styles.container, { gap: vSpacing.sm }]}>
+    <View style={styles.container}>
       {/* Upper Area: Circular Tuning Ring & Note Hero */}
       <View style={[styles.tuningRingWrapper, { height: ringWrapperH }]}>
         <Animated.View
@@ -311,14 +267,11 @@ export function TunerDisplay() {
       </View>
 
       {/* Middle Area: Dynamic Vector Instrument Headstock */}
-      {/* Hidden on compact-height screens to free vertical space for tuner */}
-      {showIllustration && (
-        <View style={[styles.illustrationContainer, { height: illustrationH }]}>
-          <View style={{ transform: [{ scale: illustrationScale }] }}>
-            <InstrumentIllustration instrumentId={activeInstrument.id} />
-          </View>
+      <View style={[styles.illustrationContainer, { height: illustrationH }]}>
+        <View style={{ transform: [{ scale: illustrationScale }] }}>
+          <InstrumentIllustration instrumentId={activeInstrument.id} />
         </View>
-      )}
+      </View>
 
       {/* Lower Area: Refreshed Gauge Scale (Apple-style rounded Card) */}
       <View
@@ -401,7 +354,8 @@ export function TunerDisplay() {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    // NOTE: gap is now set inline via vSpacing.sm so it responds to height.
+    justifyContent: 'center',
+    gap: Spacing.md,
     width: '100%',
   },
   tuningRingWrapper: {

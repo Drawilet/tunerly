@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View, StatusBar, TouchableOpacity, Platform } from 'react-native';
+import { StyleSheet, View, StatusBar, TouchableOpacity } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTuner } from '@/features/tuner/presentation/hooks/useTuner';
 import { useTunerStore } from '@/features/tuner/presentation/state/useTunerStore';
@@ -9,7 +9,7 @@ import { InstrumentSelector } from '@/features/tuner/presentation/components/Ins
 import { TuningSelector } from '@/features/tuner/presentation/components/TuningSelector';
 import { PermissionGate } from '@/features/tuner/presentation/components/PermissionGate';
 import { useTheme } from '@/features/tuner/presentation/hooks/useTheme';
-import { Fonts, BorderRadius } from '@/constants/theme';
+import { Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { DebugOverlay } from '@/features/tuner/presentation/components/DebugOverlay';
 import { useResponsive } from '@/hooks/useResponsive';
 import { ThemedText } from '@/components/themed-text';
@@ -24,13 +24,10 @@ function TunerScreen() {
   const setShowDebug = useTunerStore((s) => s.setShowDebug);
   const {
     insets,
-    isWideLayout,
+    isTablet,
+    isDesktop,
     contentMaxWidth,
     spacing,
-    vSpacing,
-    isCompactHeight,
-    height,
-    tunerScale,
   } = useResponsive();
 
   // Auto-start listening on screen mount
@@ -65,23 +62,6 @@ function TunerScreen() {
   };
 
   /**
-   * Tuner wrapper height budget (web only):
-   * Cap the tuner area so the illustration and gauge do not become
-   * comically large on tall laptop/desktop displays.
-   */
-  const tunerMaxHeight = Platform.OS === 'web'
-    ? Math.min(height * 0.65, 480 * tunerScale)
-    : undefined;
-
-  /**
-   * Flex spacer between sections.
-   * On compact-height screens we give less flex to the spacers so the
-   * tuner area (which has flex: 1) wins the extra budget.
-   * On regular/expanded screens spacers grow comfortably.
-   */
-  const spacerFlex = isCompactHeight ? 0.3 : 0.5;
-
-  /**
    * The root container is ALWAYS mounted, regardless of permission state.
    *
    * This is critical for web layout stability: if we swap to a completely
@@ -110,6 +90,7 @@ function TunerScreen() {
           paddingLeft: insets.left + spacing.md,
           paddingRight: insets.right + spacing.md,
           alignItems: 'center',
+          justifyContent: 'center',
         },
       ]}
     >
@@ -118,31 +99,17 @@ function TunerScreen() {
         backgroundColor={theme.background}
       />
 
-      {/*
-        Inner content column — uses flexible spacers rather than uniform gap.
-
-        Layout order (top → bottom):
-          [Header]
-          [Spacer — compresses first]
-          [Selectors Panel]
-          [Spacer — compresses first]
-          [Tuner Display — flex: 1, grows into available space]
-          [String Selector]
-          [Bottom padding — safe area]
-      */}
       <View
         style={{
           flex: 1,
           width: '100%',
-          maxWidth: isWideLayout ? contentMaxWidth : '100%',
-          alignSelf: 'center',
+          maxWidth: (isTablet || isDesktop) ? contentMaxWidth : '100%',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          paddingTop: vSpacing.sm,
-          paddingBottom: vSpacing.sm,
         }}
       >
-        {/* ── Brand Header ─────────────────────────────────────────────── */}
-        <View style={[styles.header, { paddingHorizontal: spacing.sm }]}>
+        {/* Brand Header */}
+        <View style={styles.header}>
           <TouchableOpacity
             style={[styles.themeToggle, { borderColor: theme.border, backgroundColor: theme.card }]}
             onPress={toggleTheme}
@@ -173,27 +140,18 @@ function TunerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── Spacer (breathes before selectors) ───────────────────────── */}
-        <View style={{ flex: spacerFlex, minHeight: vSpacing.xs, maxHeight: 24 }} />
-
-        {/* ── Selectors Panel (Instrument + Tuning) ────────────────────── */}
-        <View style={[styles.selectorsPanel, { gap: vSpacing.xs }]}>
+        {/* Selectors Panel (Instrument + Tuning) */}
+        <View style={styles.selectorsPanel}>
           <InstrumentSelector />
           <TuningSelector />
         </View>
 
-        {/* ── Spacer (breathes before tuner) ───────────────────────────── */}
-        <View style={{ flex: spacerFlex, minHeight: vSpacing.xs, maxHeight: 24 }} />
-
-        {/* ── Main Tuner Display — grows to fill available space ────────── */}
-        <View style={[styles.tunerWrapper, tunerMaxHeight ? { maxHeight: tunerMaxHeight } : {}]}>
+        {/* Main Tuner Display — grows to fill available space */}
+        <View style={styles.tunerWrapper}>
           <TunerDisplay />
         </View>
 
-        {/* ── Small spacer above string selector ───────────────────────── */}
-        <View style={{ height: vSpacing.sm }} />
-
-        {/* ── String Selection Panel ────────────────────────────────────── */}
+        {/* String Selection Panel */}
         <View style={styles.selectorWrapper}>
           <StringSelector />
         </View>
@@ -240,6 +198,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
+    marginTop: Spacing.sm,
     gap: 2,
     width: '100%',
     position: 'relative',
@@ -288,6 +247,8 @@ const styles = StyleSheet.create({
   selectorsPanel: {
     width: '100%',
     alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
   },
   tunerWrapper: {
     flex: 1,
@@ -297,6 +258,7 @@ const styles = StyleSheet.create({
   },
   selectorWrapper: {
     width: '100%',
+    paddingBottom: Spacing.sm,
   },
   permissionOverlay: {
     justifyContent: 'center',
