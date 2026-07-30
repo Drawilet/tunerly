@@ -34,7 +34,7 @@ function TunerScreen() {
   } = useResponsive();
 
   // ── Completion progress ────────────────────────────────────────────────
-  const { completedNoteIds, allComplete, onStringCompleteRef, onAllCompleteRef } =
+  const { completedPositions, allComplete, onStringCompleteRef, onAllCompleteRef } =
     useTuningProgress();
 
   // Track whether the confetti overlay is currently visible
@@ -49,7 +49,7 @@ function TunerScreen() {
 
   // Wire the per-string callback: fire ripple on the TunerDisplay ring
   useEffect(() => {
-    onStringCompleteRef.current = (_noteId: string) => {
+    onStringCompleteRef.current = (_position: number) => {
       rippleTriggerRef.current?.();
     };
   }, [onStringCompleteRef]);
@@ -187,7 +187,7 @@ function TunerScreen() {
 
         {/* String Selection Panel */}
         <View style={styles.selectorWrapper}>
-          <StringSelector completedNoteIds={completedNoteIds} />
+          <StringSelector completedPositions={completedPositions} />
         </View>
       </View>
 

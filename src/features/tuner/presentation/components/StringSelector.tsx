@@ -156,12 +156,17 @@ function PegButton({
 // ── Main StringSelector ────────────────────────────────────────────────────
 
 interface StringSelectorProps {
-  completedNoteIds?: Set<string>;
-  onStringAnimationStarted?: (noteId: string) => void;
+  /**
+   * Set of confirmed tuning position indices (0-based) — keyed by position,
+   * not note ID, to correctly handle tunings with repeated note names.
+   * Provided by useTuningProgress.
+   */
+  completedPositions?: Set<number>;
+  onStringAnimationStarted?: (position: number) => void;
 }
 
 export function StringSelector({
-  completedNoteIds = new Set(),
+  completedPositions = new Set(),
   onStringAnimationStarted,
 }: StringSelectorProps) {
   const theme = useTheme();
@@ -174,28 +179,26 @@ export function StringSelector({
   const pegFontSize    = isCompact ? 11 : isDesktop ? 18 : isTablet ? 16 : 14;
   const octaveFontSize = isCompact ? 7  : isDesktop ? 12 : isTablet ? 11 : 9;
 
-  // One animated state object per note in the active tuning.
-  // useMemo (not useRef) so the map is a plain render variable, avoiding
-  // react-hooks/refs violations when accessed during render or inside .map().
-   
-  const animStates = React.useMemo<Map<string, PegAnimState>>(() => {
-    const map = new Map<string, PegAnimState>();
-    activeTuning.notes.forEach((note) => {
-      map.set(note.id, createPegAnimState());
+  // One animated state object per string position in the active tuning.
+  // Keyed by position index (not note.id) so tunings with repeated note
+  // names (e.g. Open G: D2, D3, D4) each get their own independent state.
+  const animStates = React.useMemo<Map<number, PegAnimState>>(() => {
+    const map = new Map<number, PegAnimState>();
+    activeTuning.notes.forEach((_note, idx) => {
+      map.set(idx, createPegAnimState());
     });
     return map;
-  // tuningId drives the memo reset — notes array reference changes every render
-  // but we only want to recreate animated values when the tuning actually changes.
+  // Recreate only when tuning changes, not on every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTuning.id]);
 
   // ── Completion animation trigger ─────────────────────────────────────
-  const triggerPegCompletion = useCallback((noteId: string) => {
-    const anim = animStates.get(noteId);
+  const triggerPegCompletion = useCallback((position: number) => {
+    const anim = animStates.get(position);
     if (!anim || anim.completed) return;
     anim.completed = true;
 
-    onStringAnimationStarted?.(noteId);
+    onStringAnimationStarted?.(position);
 
     // Scale bounce: 0.95 → 1.05 → 1.0
     Animated.sequence([
@@ -234,8 +237,6 @@ export function StringSelector({
         useNativeDriver: true,
       }),
     ]).start();
-  // animStates is stable per tuning — safe to include without stale closure
-   
   }, [animStates, onStringAnimationStarted]);
 
 
@@ -254,18 +255,18 @@ export function StringSelector({
     HapticsService.selection();
   };
 
-  // ── Expose triggerPegCompletion via imperative handle ─────────────────
-  // Parent passes an `onStringAnimationStarted` ref-setter; we use a simpler
-  // approach: the parent drives completedNoteIds and we react in a useEffect.
-  const prevCompletedRef = useRef<Set<string>>(new Set());
+  // ── Expose triggerPegCompletion via reactive effect ────────────────────
+  // Diffs the incoming completedPositions set against the previous frame to
+  // fire the one-shot peg animation exactly once per newly confirmed position.
+  const prevCompletedRef = useRef<Set<number>>(new Set());
   useEffect(() => {
-    completedNoteIds.forEach((noteId) => {
-      if (!prevCompletedRef.current.has(noteId)) {
-        triggerPegCompletion(noteId);
+    completedPositions.forEach((position) => {
+      if (!prevCompletedRef.current.has(position)) {
+        triggerPegCompletion(position);
       }
     });
-    prevCompletedRef.current = new Set(completedNoteIds);
-  }, [completedNoteIds, triggerPegCompletion]);
+    prevCompletedRef.current = new Set(completedPositions);
+  }, [completedPositions, triggerPegCompletion]);
 
   return (
     <View style={styles.container}>
@@ -320,11 +321,11 @@ export function StringSelector({
         </TouchableOpacity>
 
         {/* Individual String Pegs */}
-        {activeTuning.notes.map((note) => {
+        {activeTuning.notes.map((note, idx) => {
           const isSelected  = selectedNote?.id === note.id;
           const isActive    = activeNote?.id === note.id;
-          const isCompleted = completedNoteIds.has(note.id);
-          const animState   = animStates.get(note.id) ?? createPegAnimState();
+          const isCompleted = completedPositions.has(idx);
+          const animState   = animStates.get(idx) ?? createPegAnimState();
 
           return (
             <PegButton
